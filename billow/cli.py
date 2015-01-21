@@ -5,22 +5,23 @@ import yaml
 from .util import common_parser, common_args, catch_sigint
 import billow
 
+
 def billow_list():
     catch_sigint()
     parser = common_parser('billow list')
     parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
-            '-j',
-            '--json',
-            help='json output',
-            action='store_true'
-            )
+        '-j',
+        '--json',
+        help='json output',
+        action='store_true'
+    )
     parsergroup.add_argument(
-            '-y',
-            '--yaml',
-            help='yaml output',
-            action='store_true'
-            )
+        '-y',
+        '--yaml',
+        help='yaml output',
+        action='store_true'
+    )
     args = parser.parse_args()
     common_args(args)
 

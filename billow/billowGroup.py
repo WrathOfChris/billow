@@ -4,7 +4,9 @@ from . import elb
 from . import sec
 import boto
 
+
 class billowGroup():
+
     """
     a large undulating mass of cloud services
     """
@@ -46,10 +48,10 @@ class billowGroup():
         if isinstance(other, str) or isinstance(other, unicode):
             return self.group == other
         return self.group == other.group and \
-                self.region == other.region and \
-                self.service == other.service and \
-                self.environ == other.environ and \
-                self.cluster == other.cluster
+            self.region == other.region and \
+            self.service == other.service and \
+            self.environ == other.environ and \
+            self.cluster == other.cluster
 
     def _load(self):
         if not self.rawgroup:
@@ -161,5 +163,5 @@ class billowGroup():
                 'config': i.launch_config_name,
                 'state': i.lifecycle_state,
                 'zone': i.availability_zone
-                })
+            })
         return instances

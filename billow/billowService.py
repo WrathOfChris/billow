@@ -5,7 +5,9 @@ from . import sec
 import boto
 import pprint
 
+
 class billowService():
+
     """
     a large undulating mass of cloud services
     """
@@ -24,10 +26,10 @@ class billowService():
          'environ': u'stage'}
         """
         return pprint.pformat({
-                'service': self.service,
-                'groups': self.groups,
-                'region': self.region,
-                'environ': self.environ})
+            'service': self.service,
+            'groups': self.groups,
+            'region': self.region,
+            'environ': self.environ})
 
     def __str__(self):
         """
@@ -37,8 +39,8 @@ class billowService():
 
     def __eq__(self, other):
         return self.service == other.service and \
-                self.environ == other.environ and \
-                self.region == other.region
+            self.environ == other.environ and \
+            self.region == other.region
 
     def startElement(self, name, attrs):
         if name == 'service':

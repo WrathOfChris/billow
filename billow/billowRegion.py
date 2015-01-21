@@ -6,7 +6,9 @@ import boto
 from .billowService import billowService
 from .billowGroup import billowGroup
 
+
 class billowRegion():
+
     """
     a large undulating mass of cloud services
     """
@@ -24,7 +26,7 @@ class billowRegion():
 
         self.tagservice = 'service'
         self.tagenviron = 'env'
-        self.servicetags = [ self.tagenviron, self.tagservice ]
+        self.servicetags = [self.tagenviron, self.tagservice]
 
     def list_services(self):
         self.services = dict()
@@ -53,13 +55,13 @@ class billowRegion():
         """
         if service not in self.services:
             self.services[service] = billowService(
-                    service,
-                    list(),
-                    self.region)
+                service,
+                list(),
+                self.region)
         if group:
             if group not in self.services[service].groups:
                 self.services[service].groups.append(
-                        billowGroup(group, region=self.region))
+                    billowGroup(group, region=self.region))
 
     def update_group_environ(self, group, environ):
         for k, v in self.services.iteritems():
