@@ -75,6 +75,18 @@ class aws():
                                          attempts)
                     else:
                         raise e
+
+                elif e.error_code == 'ServiceUnavailable':
+                    if self.rate_limit_delay == 0:
+                        self.rate_limit_delay = 1
+                        sys.stderr.write('api-unavailable: attempt %d\n' %
+                                         attempts)
+                    elif self.rate_limit_delay < self.rate_limit_maxdelay:
+                        self.rate_limit_delay = self.rate_limit_delay * 2
+                        sys.stderr.write('api-unavailable: attempt %d\n' %
+                                         attempts)
+                    else:
+                        raise e
                 else:
                     raise e
 
