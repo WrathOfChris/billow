@@ -10,7 +10,7 @@ import time
 import os
 
 
-class aws():
+class aws(object):
 
     def __init__(self, delay=0, maxdelay=16):
         self.rate_limit_delay = delay
