@@ -8,7 +8,7 @@ import boto.ec2
 import boto.ec2.elb
 
 
-class elb():
+class elb(object):
 
     def __init__(self, region):
         self.region = region
