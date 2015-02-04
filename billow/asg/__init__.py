@@ -8,14 +8,14 @@ import boto.ec2
 import boto.ec2.autoscale
 
 
-class asg():
+class asg(object):
 
     def __init__(self, region):
         self.region = region
         self.aws = aws.aws()
         self.asg = None
 
-    def _connect(self):
+    def __connect(self):
         if not self.asg:
             self.asg = boto.ec2.autoscale.connect_to_region(
                 self.region,
@@ -29,7 +29,7 @@ class asg():
         """
         self.asgs = list()
         marker = None
-        self._connect()
+        self.__connect()
 
         while True:
             asgs = self.aws.wrap(
@@ -50,7 +50,7 @@ class asg():
         """
         self.tags = list()
         marker = None
-        self._connect()
+        self.__connect()
 
         filters = None
         if name or tag or value:
@@ -82,7 +82,7 @@ class asg():
         """
         self.lcs = list()
         marker = None
-        self._connect()
+        self.__connect()
 
         while True:
             lcs = self.aws.wrap(
@@ -103,7 +103,7 @@ class asg():
         """
         asgs = list()
         marker = None
-        self._connect()
+        self.__connect()
 
         if not isinstance(groups, list):
             groups = [groups]
@@ -121,3 +121,28 @@ class asg():
                 break
 
         return asgs
+
+    def get_configs(self, names):
+        """
+        get LaunchConfigurations in a region
+        """
+        configs = list()
+        marker = None
+        self.__connect()
+
+        if not isinstance(names, list):
+            names = [names]
+
+        while True:
+            a = self.aws.wrap(
+                self.asg.get_all_launch_configurations,
+                names=names,
+                next_token=marker
+            )
+            configs.extend(a)
+            if a.next_token:
+                marker = a.next_token
+            else:
+                break
+
+        return configs
