@@ -82,8 +82,7 @@ def billow_get():
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
     elif args.yaml:
-        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True,
-                default_flow_style=False)
+        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
     else:
         _first = True
         for o in output:
