@@ -16,7 +16,6 @@ class billowGroup(object):
         self.group = group
         self.rawgroup = None
         self.rawconfig = None
-        self.rawsgroups = None
         self.__region = region
         self.__service = None
         self.__environ = None
@@ -83,7 +82,6 @@ class billowGroup(object):
 
         self.__config['security'] = dict()
         self.__config['security']['groups'] = self.security_groups
-        self.__config['security']['rules'] = self.security_rules
 
         return self.__config
 
@@ -136,10 +134,6 @@ class billowGroup(object):
             config = self.asg.get_configs(self.launch_config)
             if len(config) == 1:
                 self.rawconfig = config[0]
-
-    def _load_sgroups(self):
-        if not self.rawsgroups:
-            self.rawsgroups = self.sec.get_groups(self.security_groups)
 
     def push(self, rawgroup):
         """
@@ -308,29 +302,6 @@ class billowGroup(object):
         for sg in self.rawconfig.security_groups:
             sgroups.append(sg)
         return sgroups
-
-    @property
-    def security_rules(self):
-        self._load_config()
-        self._load_sgroups()
-        srules = list()
-        for sg in self.rawsgroups:
-            for sr in sg.rules:
-                rule = dict()
-                rule['name'] = sg.name
-                rule['id'] = sg.id
-                rule['from_port'] = sr.from_port
-                if sr.grants:
-                    rule['grants'] = list()
-                    for grant in sr.grants:
-                        if grant.cidr_ip:
-                            rule['grants'].append(grant.cidr_ip)
-                        if grant.group_id:
-                            rule['grants'].append(grant.group_id)
-                rule['ip_protocol'] = sr.ip_protocol
-                rule['to_port'] = sr.to_port
-                srules.append(rule)
-        return srules
 
     @property
     def public(self):

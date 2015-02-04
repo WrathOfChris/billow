@@ -22,6 +22,8 @@ class billowService(object):
         self.__region = region
         self.parent = parent
 
+        self.rawsgroups = None
+
         # service-env:region overrides passed in region
         if ':' in service:
             self.__region = service.split(':')[1]
@@ -43,14 +45,22 @@ class billowService(object):
 
     def config(self):
         self.__config = dict()
-        self.__config['region'] = self.region
-        self.__config['service'] = self.service
-        self.__config['environ'] = self.environ
+        self.__config[self.service] = dict()
+        c = self.__config[self.service]
+        c['region'] = self.region
+        c['service'] = self.service
+        c['environ'] = self.environ
         if self.cluster:
-            self.__config['cluster'] = self.cluster
-        self.__config['groups'] = list()
+            c['cluster'] = self.cluster
+
+        c['groups'] = list()
         for g in self.groups:
-            self.__config['groups'].append(g.config())
+            c['groups'].append(g.config())
+
+        c['security'] = dict()
+        c['security']['groups'] = self.security_groups
+        c['security']['rules'] = self.security_rules
+
         return self.__config
 
     def __repr__(self):
@@ -128,6 +138,10 @@ class billowService(object):
 
         self.groups = groups
 
+    def __load_sgroups(self):
+        if not self.rawsgroups:
+            self.rawsgroups = self.sec.get_groups(self.security_groups)
+
     @property
     def region(self):
         if self.parent:
@@ -162,3 +176,32 @@ class billowService(object):
             if ami != g.ami:
                 return None
         return ami
+
+    @property
+    def security_groups(self):
+        sgroups = list()
+        for g in self.groups:
+            sgroups.extend(x for x in g.security_groups if x not in sgroups)
+        return sgroups
+
+    @property
+    def security_rules(self):
+        self.__load_sgroups()
+        srules = dict()
+        for sg in self.rawsgroups:
+            if str(sg.id) not in srules:
+                srules[str(sg.id)] = list()
+            for sr in sg.rules:
+                rule = dict()
+                rule['from_port'] = sr.from_port
+                if sr.grants:
+                    rule['grants'] = list()
+                    for grant in sr.grants:
+                        if grant.cidr_ip:
+                            rule['grants'].append(grant.cidr_ip)
+                        if grant.group_id:
+                            rule['grants'].append(grant.group_id)
+                rule['ip_protocol'] = sr.ip_protocol
+                rule['to_port'] = sr.to_port
+                srules[str(sg.id)].append(rule)
+        return srules
