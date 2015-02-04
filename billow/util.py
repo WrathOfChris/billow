@@ -65,11 +65,23 @@ def common_args(args):
 
 import signal
 import sys
+import errno
 
 
 def cli_signal_handler(signal, frame):
-    sys.exit(1)
+    sys.exit(errno.EINTR)
 
 
 def catch_sigint():
     signal.signal(signal.SIGINT, cli_signal_handler)
+
+import fnmatch
+import re
+
+
+def regex_match(match, string, use_regex):
+    if use_regex and re.match(match, string):
+        return True
+    elif fnmatch.fnmatch(string, match):
+        return True
+    return False
