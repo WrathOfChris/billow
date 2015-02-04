@@ -6,7 +6,7 @@ import boto
 from .billowRegion import billowRegion
 
 
-class billowCloud():
+class billowCloud(object):
 
     """
     a large undulating mass of cloud services
@@ -18,18 +18,33 @@ class billowCloud():
 
         self.regions = list()
         for r in regions:
-            self.regions.append(billowRegion(region=r))
+            self.regions.append(billowRegion(region=r, parent=self))
 
-        self.services = dict()
+        self.services = list()
 
     def list_services(self):
-        self.services = dict()
+        self.services = list()
         for r in self.regions:
-            r.list_services()
-            # use the dict() attribute instead of the returned list()
-            self.add_services(r.services)
-        return self.services.values()
+            self.add_services(r.list_services())
+        return self.services
 
     def add_services(self, services):
-        for k, v in services.iteritems():
-            self.services[str(v)] = v
+        for v in services:
+            self.services.append(v)
+
+    def get_service(self, services, region=None):
+        out = list()
+
+        for s in services:
+            if ':' in s:
+                if not region:
+                    region = s.split(':')[1]
+                service = s.split(':')[0]
+
+            for r in self.regions:
+                if region and r.region != region:
+                    continue
+                svc = r.get_service(s)
+                out.extend(svc)
+
+        return out
