@@ -20,7 +20,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "billow-list = billow.cli:billow_list"
+            "billow-list = billow.cli:billow_list",
+            "billow-get = billow.cli:billow_get"
         ]
     }
 )
