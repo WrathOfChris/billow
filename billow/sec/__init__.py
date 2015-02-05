@@ -35,7 +35,6 @@ class sec(object):
         get SecurityGroups in a region
         """
         sgroups = list()
-        marker = None
         self.__connect()
 
         if not isinstance(groups, list):
@@ -46,5 +45,24 @@ class sec(object):
             group_ids=groups
         )
         sgroups.extend(a)
+
+        return sgroups
+
+    def find_group(self, name, vpcid=None):
+        """
+        find SecurityGroups in a region
+        """
+        sgroups = list()
+        self.__connect()
+
+        sgfilter = { 'group-name': name }
+        if vpcid:
+            sgfilter['vpc_id'] = vpcid
+
+        s = self.aws.wrap(
+            self.ec2.get_all_security_groups,
+            filters=sgfilter
+        )
+        sgroups.extend(s)
 
         return sgroups
