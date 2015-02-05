@@ -15,6 +15,8 @@ class elb(object):
         self.aws = aws.aws()
         self.elb = None
 
+        self.default_idle_timeout = 60
+
     def _connect(self):
         if not self.elb:
             self.elb = boto.ec2.elb.connect_to_region(
@@ -43,3 +45,41 @@ class elb(object):
                 break
 
         return self.elbs
+
+    def get_elb(self, names):
+        """
+        get ELB(s) by name
+        """
+        if not isinstance(names, list):
+            names = [names]
+
+        elbs = list()
+        marker = None
+        self._connect()
+
+        while True:
+            e = self.aws.wrap(
+                self.elb.get_all_load_balancers,
+                load_balancer_names=names,
+                marker=marker
+            )
+            elbs.extend(e)
+            if e.next_marker:
+                marker = e.next_marker
+            else:
+                break
+
+        return elbs
+
+    def get_elb_attr(self, name):
+        """
+        get ELB attributes by name
+        """
+        self._connect()
+
+        attr = self.aws.wrap(
+            self.elb.get_all_lb_attributes,
+            load_balancer_name=name
+        )
+
+        return attr
