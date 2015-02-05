@@ -2,6 +2,7 @@ from . import asg
 from . import dns
 from . import elb
 from . import sec
+from . import vpc
 import boto
 import sys
 from .billowService import billowService
@@ -24,6 +25,7 @@ class billowRegion(object):
         self.dns = dns.dns(self.region)
         self.elb = elb.elb(self.region)
         self.sec = sec.sec(self.region)
+        self.vpc = vpc.vpc(self.region)
 
         self.tagservice = 'service'
         self.tagenviron = 'env'

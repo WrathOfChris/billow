@@ -2,6 +2,7 @@ from . import asg
 from . import dns
 from . import elb
 from . import sec
+from . import vpc
 import boto
 import datetime
 import pprint
@@ -36,11 +37,13 @@ class billowService(object):
             self.dns = self.parent.dns
             self.elb = self.parent.elb
             self.sec = self.parent.sec
+            self.vpc = self.parent.vpc
         else:
             self.asg = asg.asg(self.region)
             self.dns = dns.dns(self.region)
             self.elb = elb.elb(self.region)
             self.sec = sec.sec(self.region)
+            self.vpc = vpc.vpc(self.region)
 
         self.tagservice = 'service'
 
@@ -86,7 +89,7 @@ class billowService(object):
                 elb['internal'] = True
             elb['subnets'] = list()
             for s in e.subnets:
-                elb['subnets'].append(s)
+                elb['subnets'].append(self.vpc.subnet_name(s))
 
             elb['policies'] = dict()
             if e.policies.app_cookie_stickiness_policies:
@@ -124,9 +127,6 @@ class billowService(object):
                             attrs.connecting_settings.idle_timeout)
                 #elb['options']['draining']
                 #elb['options']['accesslog']
-            # ports
-            # allow
-            # listeners
 
         return self.__config
 

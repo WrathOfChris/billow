@@ -29,11 +29,13 @@ class billowGroup(object):
             self.dns = self.parent.dns
             self.elb = self.parent.elb
             self.sec = self.parent.sec
+            self.vpc = self.parent.vpc
         else:
             self.asg = asg.asg(self.region)
             self.dns = dns.dns(self.region)
             self.elb = elb.elb(self.region)
             self.sec = sec.sec(self.region)
+            self.vpc = vpc.vpc(self.region)
 
         self.tagservice = 'service'
         self.tagenviron = 'env'
@@ -58,7 +60,9 @@ class billowGroup(object):
         self.__config['size']['min'] = self.min_size
         self.__config['size']['max'] = self.max_size
 
-        self.__config['subnets'] = self.subnets
+        self.__config['subnets'] = list()
+        for s in self.subnets:
+            self.__config['subnets'].append(self.vpc.subnet_name(s))
         self.__config['public'] = self.public
         if self.placement_group:
             self.__config['placement_group'] = self.placement_group
@@ -311,12 +315,8 @@ class billowGroup(object):
 
     # addrs
     # aminame
-    # security group names
-    # subnets by address
+    # intaddrs
     # ports
     # pubports
-    # allow {cidr_ip: 172.16.0.0/12, from_port: 22, ip_protocol: tcp, to_port: 22}
-    #       { from: 9090, to: 9090, group: 'payments-prod', prot: tcp }
     # egress
     # extports
-    # intaddrs
