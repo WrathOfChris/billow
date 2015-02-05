@@ -51,7 +51,7 @@ class billowRegion(object):
         # service
         for t in tags:
             if t.key == self.tagservice:
-                servicenames[t.resource_id] = { 'service': t.value }
+                servicenames[t.resource_id] = {'service': t.value}
 
         # environ
         for t in tags:
@@ -60,7 +60,7 @@ class billowRegion(object):
                     servicenames[t.resource_id] = dict()
                 servicenames[t.resource_id]['environ'] = t.value
 
-        for k,v in servicenames.iteritems():
+        for k, v in servicenames.iteritems():
             if 'service' not in v:
                 sys.stderr.write("group %s missing service tag\n" % k)
                 continue
@@ -84,13 +84,14 @@ class billowRegion(object):
             slist = [s]
 
         if len(slist) > 1:
-            sys.stderr.write("ignoring multiple services found for %s/%s\n" % (service, environ))
+            sys.stderr.write(
+                "ignoring multiple services found for %s/%s\n" % (service, environ))
 
         s = slist[0]
         if group:
             if group not in s.groups:
                 s.groups.append(billowGroup(group, region=self.region,
-                    parent=s))
+                                            parent=s))
 
         return s
 

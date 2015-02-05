@@ -91,7 +91,7 @@ def billow_get():
             else:
                 _first = False
 
-            for k,v in o.iteritems():
+            for k, v in o.iteritems():
                 if isinstance(v, str):
                     print "%s: %s" % (k, str(v))
                 else:

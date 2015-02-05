@@ -16,7 +16,7 @@ class billowService(object):
     """
 
     def __init__(self, service, groups=[], region='us-east-1', environ=None,
-            parent=None):
+                 parent=None):
         self.service = service
         self.environ = environ
         self.groups = groups
@@ -93,9 +93,11 @@ class billowService(object):
 
             elb['policies'] = dict()
             if e.policies.app_cookie_stickiness_policies:
-                elb['policies']['app_cookie'] = e.policies.app_cookie_stickiness_policies.policy_name
+                elb['policies'][
+                    'app_cookie'] = e.policies.app_cookie_stickiness_policies.policy_name
             if e.policies.lb_cookie_stickiness_policies:
-                elb['policies']['lb_cookie'] = e.policies.lb_cookie_stickiness_policies.policy_name
+                elb['policies'][
+                    'lb_cookie'] = e.policies.lb_cookie_stickiness_policies.policy_name
             if e.policies.other_policies:
                 elb['policies']['other'] = list()
                 for p in e.policies.other_policies:
@@ -104,11 +106,11 @@ class billowService(object):
             elb['listeners'] = list()
             for l in e.listeners:
                 listener = {
-                        'from': l.load_balancer_port,
-                        'to': l.instance_port,
-                        'from_prot': l.protocol,
-                        'to_prot': l.instance_protocol
-                        }
+                    'from': l.load_balancer_port,
+                    'to': l.instance_port,
+                    'from_prot': l.protocol,
+                    'to_prot': l.instance_protocol
+                }
                 if l.ssl_certificate_id:
                     listener['cert'] = self.lb_certname(l.ssl_certificate_id)
                 elb['listeners'].append(listener)
@@ -119,14 +121,14 @@ class billowService(object):
                     if 'options' not in elb:
                         elb['options'] = dict()
                     elb['options']['crosszone'] = bool(
-                            attrs.cross_zone_load_balancing)
+                        attrs.cross_zone_load_balancing)
                 if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
                     if 'options' not in elb:
                         elb['options'] = dict()
                     elb['options']['idletimeout'] = int(
-                            attrs.connecting_settings.idle_timeout)
-                #elb['options']['draining']
-                #elb['options']['accesslog']
+                        attrs.connecting_settings.idle_timeout)
+                # elb['options']['draining']
+                # elb['options']['accesslog']
 
         return self.__config
 
@@ -240,7 +242,7 @@ class billowService(object):
         return a common AMI name if all groups have the same AMI,
         otherwise None
         """
-        ami= None
+        ami = None
         for g in self.groups:
             if not ami:
                 ami = g.ami
@@ -289,7 +291,7 @@ class billowService(object):
                             rule['cidr'] = grant.cidr_ip
                         if grant.group_id:
                             rule['group'] = self.sg_name(grant.group_id,
-                                    request=True)
+                                                         request=True)
                 rule['ip_protocol'] = sr.ip_protocol
                 rule['to_port'] = sr.to_port
                 srules[sg_name].append(rule)

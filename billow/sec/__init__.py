@@ -55,7 +55,7 @@ class sec(object):
         sgroups = list()
         self.__connect()
 
-        sgfilter = { 'group-name': name }
+        sgfilter = {'group-name': name}
         if vpcid:
             sgfilter['vpc_id'] = vpcid
 
