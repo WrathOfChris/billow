@@ -81,7 +81,8 @@ class billowGroup(object):
             self.__config['config']['role'] = self.config_role
 
         self.__config['security'] = dict()
-        self.__config['security']['groups'] = self.security_groups
+        for sg in self.security_groups:
+            self.__config['security']['groups'] = self.parent.sg_name(sg)
 
         return self.__config
 
