@@ -16,6 +16,7 @@ class billowGroup(object):
         self.group = group
         self.rawgroup = None
         self.rawconfig = None
+        self.rawinstances = None
         self.__region = region
         self.__service = None
         self.__environ = None
@@ -89,6 +90,14 @@ class billowGroup(object):
             self.__config['security']['groups'] = self.parent.sg_name(sg)
 
         return self.__config
+
+    def info(self):
+        self.__info = self.config()
+        self.__info['instances'] = list()
+        instances = self.instances
+        for i in instances:
+            self.__info['instances'].append(i)
+        return self.__info
 
     def __repr__(self):
         """
@@ -273,19 +282,89 @@ class billowGroup(object):
             tags.append({t.key: t.value})
         return tags
 
+    def __make_instance_group(self, instance):
+        """
+        Make instance dict from boto autoscale instance object
+        """
+        return {
+                'id': instance.instance_id,
+                'health': instance.health_status,
+                'config': instance.launch_config_name,
+                'state': instance.lifecycle_state,
+                'zone': instance.availability_zone
+                }
+
+    def __make_instance(self, instance):
+        """
+        Make instance dict from boto instance object
+        """
+        i = {
+                # id, health, config, state, zone
+                'architecture': instance.architecture,
+                'ebs_optimized': instance.ebs_optimized,
+                'public_dns_name': instance.public_dns_name,
+                'private_dns_name': instance.private_dns_name,
+                'image_id': instance.image_id,
+                'instance_profile': instance.instance_profile['arn'],
+                'instance_type': instance.instance_type,
+                'public_ip_address': instance.ip_address,
+                'private_ip_address': instance.private_ip_address,
+                'key_name': instance.key_name,
+                'launch_time': instance.launch_time,
+                'instance_state': instance.state,
+                'subnet_id': instance.subnet_id,
+                'virtualization_type': instance.virtualization_type,
+                'vpc_id': instance.vpc_id
+                }
+
+        if instance.tags:
+            i['tags'] = dict()
+            for tname, tvalue in instance.tags.iteritems():
+                i['tags'][tname] = tvalue
+
+        i['groups'] = list()
+        for g in instance.groups:
+            i['groups'].append(g.id)
+
+        return i
+
     @property
-    def instances(self):
+    def instancestatus(self):
         self._load()
         instances = list()
         for i in self.rawgroup.instances:
-            instances.append({
-                'id': i.instance_id,
-                'health': i.health_status,
-                'config': i.launch_config_name,
-                'state': i.lifecycle_state,
-                'zone': i.availability_zone
-            })
+            instances.append(self.__make_instance_group(i))
         return instances
+
+    @property
+    def instances(self):
+        self._load()
+        instances = dict()
+        for i in self.rawgroup.instances:
+            instances[i.instance_id] = self.__make_instance_group(i)
+
+        self.rawinstances = self.asg.get_instance(instances.keys())
+        for i in self.rawinstances:
+            instances[i.id].update(self.__make_instance(i))
+
+        return instances.values()
+
+    def get_instance(self, instance):
+        self._load()
+        inst = None
+        for i in self.rawgroup.instances:
+            if i.instance_id == instance:
+                inst = self.__make_instance_group(i)
+
+        # Only return instance info if the instance is part of a group
+        if not inst:
+            return None
+
+        rawinst = self.asg.get_instance(instance)
+        if len(rawinst) != 1:
+            return None
+        inst.update(self.__make_instance(rawinst[0]))
+        return inst
 
     @property
     def arn(self):
