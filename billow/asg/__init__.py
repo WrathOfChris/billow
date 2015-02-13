@@ -14,10 +14,19 @@ class asg(object):
         self.region = region
         self.aws = aws.aws()
         self.asg = None
+        self.ec2 = None
 
     def __connect(self):
         if not self.asg:
             self.asg = boto.ec2.autoscale.connect_to_region(
+                self.region,
+                aws_access_key_id=self.aws.access_key(),
+                aws_secret_access_key=self.aws.secret_key()
+            )
+
+    def __connect_ec2(self):
+        if not self.ec2:
+            self.ec2 = boto.ec2.connect_to_region(
                 self.region,
                 aws_access_key_id=self.aws.access_key(),
                 aws_secret_access_key=self.aws.secret_key()
@@ -146,3 +155,34 @@ class asg(object):
                 break
 
         return configs
+
+    def get_instance(self, instance_ids):
+        """
+        get Instances in a region
+        """
+        instances = list()
+        marker = None
+        self.__connect_ec2()
+
+        if not isinstance(instance_ids, list):
+            instance_ids = [instance_ids]
+
+        while True:
+            #
+            # Use get_all_reservations() since get_only_instances does not
+            # support next_token for rate-limiting
+            #
+            reservations = self.aws.wrap(
+                self.ec2.get_all_reservations,
+                instance_ids=instance_ids,
+                next_token=marker
+            )
+            for r in reservations:
+                for i in r.instances:
+                    instances.append(i)
+            if reservations.next_token:
+                marker = reservations.next_token
+            else:
+                break
+
+        return instances
