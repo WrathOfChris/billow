@@ -343,6 +343,10 @@ class billowGroup(object):
         for i in self.rawgroup.instances:
             instances[i.instance_id] = self.__make_instance_group(i)
 
+        # No instances found, do not bother looking for info
+        if not instances:
+            return list()
+
         self.rawinstances = self.asg.get_instance(instances.keys())
         for i in self.rawinstances:
             instances[i.id].update(self.__make_instance(i))
