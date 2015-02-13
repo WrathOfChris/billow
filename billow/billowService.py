@@ -22,6 +22,7 @@ class billowService(object):
         self.groups = groups
         self.__region = region
         self.parent = parent
+        self.balancers = list()
 
         self.rawsgroups = None
         self.rawelbs = None
@@ -79,7 +80,7 @@ class billowService(object):
                 elb['source_group'] = e.source_security_group.name
             elb['zones'] = list()
             for z in e.availability_zones:
-                elb['zones'] = z
+                elb['zones'].append(z)
             elb['health'] = dict()
             elb['health']['timeout'] = e.health_check.timeout
             elb['health']['target'] = e.health_check.target
@@ -120,8 +121,7 @@ class billowService(object):
                 if attrs.cross_zone_load_balancing:
                     if 'options' not in elb:
                         elb['options'] = dict()
-                    elb['options']['crosszone'] = bool(
-                        attrs.cross_zone_load_balancing)
+                    elb['options']['crosszone'] = bool(attrs.cross_zone_load_balancing)
                 if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
                     if 'options' not in elb:
                         elb['options'] = dict()
@@ -131,6 +131,18 @@ class billowService(object):
                 # elb['options']['accesslog']
 
         return self.__config
+
+    def info(self):
+        self.__info = self.config()
+
+        for e in self.rawelbs:
+            self.__info[self.service]['load_balancers'][str(e.name)]['dns_name'] = e.dns_name
+
+        self.__info[self.service]['groups'] = list()
+        for g in self.groups:
+            self.__info[self.service]['groups'].append(g.info())
+
+        return self.__info
 
     def __repr__(self):
         return pprint.pformat(self.config())
@@ -306,3 +318,10 @@ class billowService(object):
 
     def lb_certname(self, cert):
         return cert.split('/')[-1]
+
+    def get_instance(self, instance):
+        for g in self.groups:
+            i = g.get_instance(instance)
+            if i:
+                return i
+        return None
