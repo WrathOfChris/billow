@@ -33,6 +33,8 @@ class billowCloud(object):
             self.services.append(v)
 
     def get_service(self, services, region=None):
+        if not isinstance(services, list):
+            services = [services]
         out = list()
 
         for s in services:
