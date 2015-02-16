@@ -17,6 +17,7 @@ class dns(object):
         self.r53 = None
         self.sts = None
         self.ststok = None
+        self.role = None
 
     def __connect(self, role=None):
         if not self.sts:
@@ -24,13 +25,15 @@ class dns(object):
                     aws_access_key_id=self.aws.access_key(),
                     aws_secret_access_key=self.aws.secret_key())
 
-        if role and not self.ststok:
-            self.ststok = self.sts.assume_role(role, 'billow')
-            self.r53 = boto.connect_route53(
-                aws_access_key_id=self.ststok.credentials.access_key,
-                aws_secret_access_key=self.ststok.credentials.secret_key,
-                security_token=self.ststok.credentials.session_token
-            )
+        if role:
+            if not self.ststok or role != self.role:
+                self.role = role
+                self.ststok = self.sts.assume_role(role, 'billow')
+                self.r53 = boto.connect_route53(
+                    aws_access_key_id=self.ststok.credentials.access_key,
+                    aws_secret_access_key=self.ststok.credentials.secret_key,
+                    security_token=self.ststok.credentials.session_token
+                )
 
         if not self.r53:
             self.r53 = boto.connect_route53(
