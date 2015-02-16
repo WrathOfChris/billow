@@ -26,6 +26,10 @@ class billowEndpoint(object):
 
         self.dns = dns.dns(region)
 
+        for z in self.zones[:]:
+            if z.endswith('.'):
+                z = z[:-1]
+
     def __load(self):
         if not self.rawzones:
             self.rawzones = dict()
