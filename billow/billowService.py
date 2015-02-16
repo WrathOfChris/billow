@@ -225,7 +225,11 @@ class billowService(object):
 
     def __load_elbs(self):
         if not self.rawelbs:
-            self.rawelbs = self.elb.get_elb(self.load_balancers)
+            # Never query an empty list of ELBs
+            if self.load_balancers:
+                self.rawelbs = self.elb.get_elb(self.load_balancers)
+            else:
+                self.rawelbs = list()
 
     @property
     def region(self):
