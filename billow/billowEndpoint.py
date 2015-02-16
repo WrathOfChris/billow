@@ -37,20 +37,33 @@ class billowEndpoint(object):
 
             for k, v in self.rawzones.iteritems():
                 for zr in v:
-                    if zr.type != 'CNAME':
+                    if zr.type != 'CNAME' and zr.type != 'A':
                         continue
-                    for r in zr.resource_records:
-                        name = r
-                        if name.endswith('.'):
-                            name = r[:-1]
-                        dest = zr.name
+
+                    name = zr.name
+                    if name.endswith('.'):
+                        name = name[:-1]
+
+                    if zr.type == 'CNAME':
+                        for r in zr.resource_records:
+                            dest = r
+                            if dest.endswith('.'):
+                                dest = dest[:-1]
+                            if dest in self.reverse:
+                                if name not in self.reverse[dest]:
+                                    self.reverse[dest].append(name)
+                            else:
+                                self.reverse[dest] = [name]
+
+                    if zr.type == 'A' and zr.alias_dns_name:
+                        dest = zr.alias_dns_name
                         if dest.endswith('.'):
-                            dest = zr.name[:-1]
-                        if name in self.reverse:
-                            if zr.name not in self.reverse[name]:
-                                self.reverse[name].append(dest)
+                            dest = dest[:-1]
+                        if dest in self.reverse:
+                            if name not in self.reverse[dest]:
+                                self.reverse[dest].append(name)
                         else:
-                            self.reverse[name] = [dest]
+                            self.reverse[dest] = [name]
 
     def set_role(self, zone, role):
         if zone not in self.zones:
