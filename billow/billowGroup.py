@@ -305,7 +305,6 @@ class billowGroup(object):
                 'public_dns_name': instance.public_dns_name,
                 'private_dns_name': instance.private_dns_name,
                 'image_id': instance.image_id,
-                'instance_profile': instance.instance_profile['arn'],
                 'instance_type': instance.instance_type,
                 'public_ip_address': instance.ip_address,
                 'private_ip_address': instance.private_ip_address,
@@ -316,6 +315,8 @@ class billowGroup(object):
                 'virtualization_type': instance.virtualization_type,
                 'vpc_id': instance.vpc_id
                 }
+        if instance.instance_profile and 'arn' in instance.instance_profile:
+            i['instance_profile'] = instance.instance_profile['arn']
 
         if instance.tags:
             i['tags'] = dict()
