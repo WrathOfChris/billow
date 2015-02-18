@@ -7,7 +7,7 @@ import boto
 import boto.ec2
 import boto.ec2.autoscale
 import time
-import re
+import fnmatch, re
 
 
 class asg(object):
@@ -227,15 +227,13 @@ class asg(object):
 
         return images
 
-    def find_configs(self, regex):
+    def cache_configs(self):
         """
-        find LaunchConfigurations by regex.
-
         There is no API for this, so implement a simple cache to preserve the
         full list of LaunchConfigs since this can be a heavy call.
         """
-
-        if self.__lc_find_cache and (self.__lc_find_cache_time + self.cachetime) < time.time():
+        if self.__lc_find_cache and (self.__lc_find_cache_time +
+                self.cachetime) < time.time():
             self.__lc_find_cache = None
 
         if not self.__lc_find_cache:
@@ -258,9 +256,28 @@ class asg(object):
                     key=lambda a: a.name, reverse=True
                     )
 
+    def regex_configs(self, regex):
+        """
+        find LaunchConfigurations by regex.
+        """
+        self.cache_configs()
+
         configs = list()
         for lc in self.__lc_find_cache:
             if re.match(regex, lc.name):
+                configs.append(lc)
+
+        return configs
+
+    def match_configs(self, match):
+        """
+        find LaunchConfigurations by fnmatch
+        """
+        self.cache_configs()
+
+        configs = list()
+        for lc in self.__lc_find_cache:
+            if fnmatch.fnmatch(lc.name, match):
                 configs.append(lc)
 
         return configs

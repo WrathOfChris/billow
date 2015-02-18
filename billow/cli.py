@@ -252,8 +252,9 @@ def billow_find_config():
     output = list()
     bc = billow.billowCloud(regions=args.regions)
     for r in bc.regions:
-        config = r.asg.find_configs('%s-%s-\d{14}' % (service, environ))
-        if config:
+        c = billow.billowConfig(region=r.region, parent=r)
+        configs = c.list(service, environ)
+        for config in configs:
             output.append({
                 'name': config.name,
                 'image_id': config.image_id
@@ -264,18 +265,8 @@ def billow_find_config():
     elif args.yaml:
         print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
     else:
-        _first = True
         for o in output:
-            if not _first:
-                print ""
-            else:
-                _first = False
-
-            for k, v in o.iteritems():
-                if isinstance(v, str):
-                    print "%s: %s" % (k, str(v))
-                else:
-                    print "%s: %s" % (k, pprint.pformat(v))
+            print "%s %s" % (str(o['name']), str(o['image_id']))
 
     sys.exit(0)
 
@@ -304,18 +295,11 @@ def billow_list_config():
     args = parser.parse_args()
     common_args(args)
 
-    if '-' not in args.config:
-        sys.stderr.write('service-environ required\n')
-        sys.exit(1)
-
-    service = args.config.rsplit('-')[0]
-    environ = args.config.rsplit('-')[1]
-
     output = list()
     bc = billow.billowCloud(regions=args.regions)
     for r in bc.regions:
         c = billow.billowConfig(region=r.region, parent=r)
-        configs = c.list(service, environ)
+        configs = c.match(args.config)
         for config in configs:
             output.append({
                 'name': config.name,

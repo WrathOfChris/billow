@@ -84,13 +84,13 @@ class billowConfig(object):
 
         for f in formats:
             config = None
-            configs = self.asg.find_configs(f)
+            configs = self.asg.regex_configs(f)
             if configs:
                 configs = sorted(configs, key=lambda c: c.name, reverse=True)
                 return config[0]
 
         # 4. {{service}}
-        configs = self.asg.find_configs(service)
+        configs = self.asg.regex_configs(service)
         if configs:
             return configs[0]
 
@@ -111,13 +111,26 @@ class billowConfig(object):
 
         for f in formats:
             config = None
-            configs = self.asg.find_configs(f)
+            configs = self.asg.regex_configs(f)
             if configs:
                 configlist.extend(sorted(configs, key=lambda c: c.name, reverse=True))
 
         # 4. {{service}}
-        configs = self.asg.find_configs(service)
+        configs = self.asg.regex_configs(service)
         if configs:
             configlist.extend(configs)
+
+        return configlist
+
+    def match(self, match):
+        """
+        Match configs using fnmatch()
+        """
+        configlist = list()
+
+        config = None
+        configs = self.asg.match_configs(match)
+        if configs:
+            configlist.extend(sorted(configs, key=lambda c: c.name, reverse=True))
 
         return configlist
