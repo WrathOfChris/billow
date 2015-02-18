@@ -141,7 +141,7 @@ def billow_find_image():
                 'id': image.id,
                 'name': image.name,
                 'description': image.description
-                })
+            })
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -205,7 +205,7 @@ def billow_list_image():
                 'id': image.id,
                 'name': image.name,
                 'description': image.description
-                })
+            })
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -258,7 +258,7 @@ def billow_find_config():
             output.append({
                 'name': config.name,
                 'image_id': config.image_id
-                })
+            })
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -304,7 +304,7 @@ def billow_list_config():
             output.append({
                 'name': config.name,
                 'image_id': config.image_id
-                })
+            })
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))

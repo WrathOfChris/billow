@@ -7,7 +7,8 @@ import boto
 import boto.ec2
 import boto.ec2.autoscale
 import time
-import fnmatch, re
+import fnmatch
+import re
 
 
 class asg(object):
@@ -233,7 +234,7 @@ class asg(object):
         full list of LaunchConfigs since this can be a heavy call.
         """
         if self.__lc_find_cache and (self.__lc_find_cache_time +
-                self.cachetime) < time.time():
+                                     self.cachetime) < time.time():
             self.__lc_find_cache = None
 
         if not self.__lc_find_cache:
@@ -252,9 +253,9 @@ class asg(object):
                 else:
                     break
             self.__lc_find_cache = sorted(
-                    self.__lc_find_cache,
-                    key=lambda a: a.name, reverse=True
-                    )
+                self.__lc_find_cache,
+                key=lambda a: a.name, reverse=True
+            )
 
     def regex_configs(self, regex):
         """

@@ -22,8 +22,8 @@ class dns(object):
     def __connect(self, role=None):
         if not self.sts:
             self.sts = boto.sts.connect_to_region(self.region,
-                    aws_access_key_id=self.aws.access_key(),
-                    aws_secret_access_key=self.aws.secret_key())
+                                                  aws_access_key_id=self.aws.access_key(),
+                                                  aws_secret_access_key=self.aws.secret_key())
 
         if role:
             if not self.ststok or role != self.role:
@@ -46,16 +46,16 @@ class dns(object):
 
         # XXX consider try/catch boto.route53.exception.DNSServerError
         zone = self.aws.wrap(
-                self.r53.get_zone,
-                dnsname
-                )
+            self.r53.get_zone,
+            dnsname
+        )
 
         if not zone:
             return list()
 
         # XXX consider try/catch boto.route53.exception.DNSServerError
         zonerecs = self.aws.wrap(
-                zone.get_records
-                )
+            zone.get_records
+        )
 
         return zonerecs

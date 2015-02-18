@@ -78,9 +78,9 @@ class billowConfig(object):
         3. {{service}}
         """
         formats = [
-                '%s-%s-\d{14}' % (environ, service),
-                '%s-\d{14}' % service
-                ]
+            '%s-%s-\d{14}' % (environ, service),
+            '%s-\d{14}' % service
+        ]
 
         for f in formats:
             config = None
@@ -104,16 +104,17 @@ class billowConfig(object):
         3. {{service}}
         """
         formats = [
-                '%s-%s-\d{14}' % (environ, service),
-                '%s-\d{14}' % service
-                ]
+            '%s-%s-\d{14}' % (environ, service),
+            '%s-\d{14}' % service
+        ]
         configlist = list()
 
         for f in formats:
             config = None
             configs = self.asg.regex_configs(f)
             if configs:
-                configlist.extend(sorted(configs, key=lambda c: c.name, reverse=True))
+                configlist.extend(
+                    sorted(configs, key=lambda c: c.name, reverse=True))
 
         # 4. {{service}}
         configs = self.asg.regex_configs(service)
@@ -131,6 +132,7 @@ class billowConfig(object):
         config = None
         configs = self.asg.match_configs(match)
         if configs:
-            configlist.extend(sorted(configs, key=lambda c: c.name, reverse=True))
+            configlist.extend(
+                sorted(configs, key=lambda c: c.name, reverse=True))
 
         return configlist

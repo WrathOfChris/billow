@@ -121,7 +121,8 @@ class billowService(object):
                 if attrs.cross_zone_load_balancing:
                     if 'options' not in elb:
                         elb['options'] = dict()
-                    elb['options']['crosszone'] = bool(attrs.cross_zone_load_balancing)
+                    elb['options']['crosszone'] = bool(
+                        attrs.cross_zone_load_balancing)
                 if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
                     if 'options' not in elb:
                         elb['options'] = dict()
@@ -136,7 +137,8 @@ class billowService(object):
         self.__info = self.config()
 
         for e in self.rawelbs:
-            self.__info[self.service]['load_balancers'][str(e.name)]['dns_name'] = e.dns_name
+            self.__info[self.service]['load_balancers'][
+                str(e.name)]['dns_name'] = e.dns_name
 
         self.__info[self.service]['groups'] = list()
         for g in self.groups:

@@ -38,10 +38,10 @@ class billowImage(object):
         4. {{service}}
         """
         formats = [
-                ('%s-%s-*' % (environ, service), '%s-%s' % (environ, service)),
-                ('all-%s-*' % service, 'all-%s' % service),
-                ('%s-*' % service, service)
-                ]
+            ('%s-%s-*' % (environ, service), '%s-%s' % (environ, service)),
+            ('all-%s-*' % service, 'all-%s' % service),
+            ('%s-*' % service, service)
+        ]
 
         for f, m in formats:
             ami = None
@@ -69,17 +69,18 @@ class billowImage(object):
         4. {{service}}
         """
         formats = [
-                ('%s-%s-*' % (environ, service), '%s-%s' % (environ, service)),
-                ('all-%s-*' % service, 'all-%s' % service),
-                ('%s-*' % service, service)
-                ]
+            ('%s-%s-*' % (environ, service), '%s-%s' % (environ, service)),
+            ('all-%s-*' % service, 'all-%s' % service),
+            ('%s-*' % service, service)
+        ]
         amilist = list()
 
         for f, m in formats:
             ami = None
             amis = self.asg.get_images_byname(f)
             if amis:
-                amilist.extend(sorted(amis, key=lambda a: a.name, reverse=True))
+                amilist.extend(
+                    sorted(amis, key=lambda a: a.name, reverse=True))
 
         # 4. {{service}}
         amis = self.asg.get_images_byname(service)

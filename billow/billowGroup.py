@@ -287,34 +287,34 @@ class billowGroup(object):
         Make instance dict from boto autoscale instance object
         """
         return {
-                'id': instance.instance_id,
-                'health': instance.health_status,
-                'config': instance.launch_config_name,
-                'state': instance.lifecycle_state,
-                'zone': instance.availability_zone
-                }
+            'id': instance.instance_id,
+            'health': instance.health_status,
+            'config': instance.launch_config_name,
+            'state': instance.lifecycle_state,
+            'zone': instance.availability_zone
+        }
 
     def __make_instance(self, instance):
         """
         Make instance dict from boto instance object
         """
         i = {
-                # id, health, config, state, zone
-                'architecture': instance.architecture,
-                'ebs_optimized': instance.ebs_optimized,
-                'public_dns_name': instance.public_dns_name,
-                'private_dns_name': instance.private_dns_name,
-                'image_id': instance.image_id,
-                'instance_type': instance.instance_type,
-                'public_ip_address': instance.ip_address,
-                'private_ip_address': instance.private_ip_address,
-                'key_name': instance.key_name,
-                'launch_time': instance.launch_time,
-                'instance_state': instance.state,
-                'subnet_id': instance.subnet_id,
-                'virtualization_type': instance.virtualization_type,
-                'vpc_id': instance.vpc_id
-                }
+            # id, health, config, state, zone
+            'architecture': instance.architecture,
+            'ebs_optimized': instance.ebs_optimized,
+            'public_dns_name': instance.public_dns_name,
+            'private_dns_name': instance.private_dns_name,
+            'image_id': instance.image_id,
+            'instance_type': instance.instance_type,
+            'public_ip_address': instance.ip_address,
+            'private_ip_address': instance.private_ip_address,
+            'key_name': instance.key_name,
+            'launch_time': instance.launch_time,
+            'instance_state': instance.state,
+            'subnet_id': instance.subnet_id,
+            'virtualization_type': instance.virtualization_type,
+            'vpc_id': instance.vpc_id
+        }
         if instance.instance_profile and 'arn' in instance.instance_profile:
             i['instance_profile'] = instance.instance_profile['arn']
 
