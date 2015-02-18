@@ -6,6 +6,8 @@ from billow import aws
 import boto
 import boto.ec2
 import boto.ec2.autoscale
+import time
+import re
 
 
 class asg(object):
@@ -15,6 +17,9 @@ class asg(object):
         self.aws = aws.aws()
         self.asg = None
         self.ec2 = None
+        self.cachetime = 60
+        self.__lc_find_cache_time = time.time()
+        self.__lc_find_cache = None
 
     def __connect(self):
         if not self.asg:
@@ -186,3 +191,76 @@ class asg(object):
                 break
 
         return instances
+
+    def get_images_byname(self, name):
+        """
+        get Images in a region
+        """
+        images = list()
+        self.__connect_ec2()
+        amifilter = {'name': name}
+
+        images = self.aws.wrap(
+            self.ec2.get_all_images,
+            filters=amifilter
+        )
+
+        return images
+
+    def get_images_bytags(self, tags):
+        """
+        get Images in a region
+        tags = { 'key': value, 'key2': value2 }
+        """
+        images = list()
+        self.__connect_ec2()
+
+        amifilter = list()
+        for k, v in tags.iteritems():
+            f = {'tag:%s' % k, v}
+            amifilter.append(f)
+
+        images = self.aws.wrap(
+            self.ec2.get_all_images,
+            filters=amifilter
+        )
+
+        return images
+
+    def find_configs(self, regex):
+        """
+        find LaunchConfigurations by regex.
+
+        There is no API for this, so implement a simple cache to preserve the
+        full list of LaunchConfigs since this can be a heavy call.
+        """
+
+        if self.__lc_find_cache and (self.__lc_find_cache_time + self.cachetime) < time.time():
+            self.__lc_find_cache = None
+
+        if not self.__lc_find_cache:
+            self.__lc_find_cache = list()
+            marker = None
+            self.__connect()
+
+            while True:
+                lcs = self.aws.wrap(
+                    self.asg.get_all_launch_configurations,
+                    next_token=marker
+                )
+                self.__lc_find_cache.extend(lcs)
+                if lcs.next_token:
+                    marker = lcs.next_token
+                else:
+                    break
+            self.__lc_find_cache = sorted(
+                    self.__lc_find_cache,
+                    key=lambda a: a.name, reverse=True
+                    )
+
+        configs = list()
+        for lc in self.__lc_find_cache:
+            if re.match(regex, lc.name):
+                configs.append(lc)
+
+        return configs
