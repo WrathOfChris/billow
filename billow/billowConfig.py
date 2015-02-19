@@ -62,15 +62,19 @@ class billowConfig(object):
         else:
             self.asg = asg.asg(self.region)
 
-    def find_by_name(self, name, configs):
-        for c in configs:
-            if str(c.name) == name:
-                return c
-            if re.match("%s-\d{14}" % name, str(c.name)):
-                return c
-        return None
+    def search(self, regex):
+        """
+        Search config list by regex
+        """
+        return self.asg.regex_configs(regex)
 
-    def search(self, service, environ):
+    def match(self, match):
+        """
+        Match configs using fnmatch()
+        """
+        return self.asg.match_configs(match)
+
+    def list_dated_newest(self, service, environ):
         """
         Search config list, find best match:
         1. {{environ}}-{{service}}-{{date}}
@@ -79,60 +83,24 @@ class billowConfig(object):
         """
         formats = [
             '%s-%s-\d{14}' % (environ, service),
-            '%s-\d{14}' % service
+            '%s-\d{14}' % service,
+            service
         ]
 
+        configlist = list()
         for f in formats:
-            config = None
             configs = self.asg.regex_configs(f)
             if configs:
                 configs = sorted(configs, key=lambda c: c.name, reverse=True)
-                return config[0]
+                configlist.extend(configs)
 
-        # 4. {{service}}
-        configs = self.asg.regex_configs(service)
-        if configs:
-            return configs[0]
+        return configlist
 
+    def get_dated_newest(self, service, environ):
+        """
+        Get single newest config from list, based on postfixed YYYYMMDDHHMMSS
+        """
+        configlist = self.list_dated_newest(service, environ)
+        if configlist:
+            return configlist[0]
         return None
-
-    def list(self, service, environ):
-        """
-        List configs, order by best match:
-        1. {{environ}}-{{service}}-{{date}}
-        2. {{service}}-{{date}}
-        3. {{service}}
-        """
-        formats = [
-            '%s-%s-\d{14}' % (environ, service),
-            '%s-\d{14}' % service
-        ]
-        configlist = list()
-
-        for f in formats:
-            config = None
-            configs = self.asg.regex_configs(f)
-            if configs:
-                configlist.extend(
-                    sorted(configs, key=lambda c: c.name, reverse=True))
-
-        # 4. {{service}}
-        configs = self.asg.regex_configs(service)
-        if configs:
-            configlist.extend(configs)
-
-        return configlist
-
-    def match(self, match):
-        """
-        Match configs using fnmatch()
-        """
-        configlist = list()
-
-        config = None
-        configs = self.asg.match_configs(match)
-        if configs:
-            configlist.extend(
-                sorted(configs, key=lambda c: c.name, reverse=True))
-
-        return configlist

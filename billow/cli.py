@@ -6,6 +6,7 @@ import yaml
 import pprint
 from .util import common_parser, common_args, catch_sigint
 import billow
+import re
 
 
 def billow_list():
@@ -100,9 +101,9 @@ def billow_get():
     sys.exit(0)
 
 
-def billow_find_image():
+def billow_find_images():
     catch_sigint()
-    parser = common_parser('billow find image')
+    parser = common_parser('billow find images')
     parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '-j',
@@ -135,71 +136,7 @@ def billow_find_image():
     bc = billow.billowCloud(regions=args.regions)
     for r in bc.regions:
         i = billow.billowImage(region=r.region, parent=r)
-        image = i.search(service, environ)
-        if image:
-            output.append({
-                'id': image.id,
-                'name': image.name,
-                'description': image.description
-            })
-
-    if args.json:
-        print json.dumps(output, indent=4, separators=(',', ': '))
-    elif args.yaml:
-        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
-    else:
-        _first = True
-        for o in output:
-            if not _first:
-                print ""
-            else:
-                _first = False
-
-            for k, v in o.iteritems():
-                if isinstance(v, str):
-                    print "%s: %s" % (k, str(v))
-                else:
-                    print "%s: %s" % (k, pprint.pformat(v))
-
-    sys.exit(0)
-
-
-def billow_list_image():
-    catch_sigint()
-    parser = common_parser('billow list image')
-    parsergroup = parser.add_mutually_exclusive_group()
-    parsergroup.add_argument(
-        '-j',
-        '--json',
-        help='json output',
-        action='store_true'
-    )
-    parsergroup.add_argument(
-        '-y',
-        '--yaml',
-        help='yaml output',
-        action='store_true'
-    )
-    parser.add_argument(
-        'image',
-        type=str,
-        help='image to find'
-    )
-    args = parser.parse_args()
-    common_args(args)
-
-    if '-' not in args.image:
-        sys.stderr.write('service-environ required\n')
-        sys.exit(1)
-
-    service = args.image.rsplit('-')[0]
-    environ = args.image.rsplit('-')[1]
-
-    output = list()
-    bc = billow.billowCloud(regions=args.regions)
-    for r in bc.regions:
-        i = billow.billowImage(region=r.region, parent=r)
-        images = i.list(service, environ)
+        images = i.list_dated_newest(service, environ)
         for image in images:
             output.append({
                 'id': image.id,
@@ -218,9 +155,65 @@ def billow_list_image():
     sys.exit(0)
 
 
-def billow_find_config():
+def billow_list_images():
     catch_sigint()
-    parser = common_parser('billow find config')
+    parser = common_parser('billow list images')
+    parsergroup = parser.add_mutually_exclusive_group()
+    parsergroup.add_argument(
+        '-j',
+        '--json',
+        help='json output',
+        action='store_true'
+    )
+    parsergroup.add_argument(
+        '-y',
+        '--yaml',
+        help='yaml output',
+        action='store_true'
+    )
+    parsergroup.add_argument(
+        '--regex',
+        help='regex filter',
+        type=str
+    )
+    parser.add_argument(
+        'image',
+        type=str,
+        help='image to find'
+    )
+    args = parser.parse_args()
+    common_args(args)
+
+    output = list()
+    bc = billow.billowCloud(regions=args.regions)
+    for r in bc.regions:
+        i = billow.billowImage(region=r.region, parent=r)
+        try:
+            images = i.search(args.image, regex=args.regex)
+        except re.error:
+            sys.stderr.write('bad regex\n')
+            sys.exit(errno.EINVAL)
+        for image in images:
+            output.append({
+                'id': image.id,
+                'name': image.name,
+                'description': image.description
+            })
+
+    if args.json:
+        print json.dumps(output, indent=4, separators=(',', ': '))
+    elif args.yaml:
+        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
+    else:
+        for o in output:
+            print "%s %s" % (str(o['id']), str(o['name']))
+
+    sys.exit(0)
+
+
+def billow_find_configs():
+    catch_sigint()
+    parser = common_parser('billow find configs')
     parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '-j',
@@ -253,7 +246,7 @@ def billow_find_config():
     bc = billow.billowCloud(regions=args.regions)
     for r in bc.regions:
         c = billow.billowConfig(region=r.region, parent=r)
-        configs = c.list(service, environ)
+        configs = c.list_dated_newest(service, environ)
         for config in configs:
             output.append({
                 'name': config.name,
@@ -271,9 +264,9 @@ def billow_find_config():
     sys.exit(0)
 
 
-def billow_list_config():
+def billow_list_configs():
     catch_sigint()
-    parser = common_parser('billow list config')
+    parser = common_parser('billow list configs')
     parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '-j',

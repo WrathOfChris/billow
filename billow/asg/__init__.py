@@ -193,9 +193,13 @@ class asg(object):
 
         return instances
 
-    def get_images_byname(self, name):
+    def match_images_name(self, name):
         """
-        get Images in a region
+        match Images in a region.
+
+        An asterisk (*) matches zero or more characters, and a question mark
+        (?) matches exactly one character.
+        http://docs.aws.amazon.com/AWSEC2/latest/CommandLineReference/ApiReference-cmd-DescribeImages.html
         """
         images = list()
         self.__connect_ec2()
@@ -208,7 +212,7 @@ class asg(object):
 
         return images
 
-    def get_images_bytags(self, tags):
+    def match_images_tags(self, tags):
         """
         get Images in a region
         tags = { 'key': value, 'key2': value2 }
@@ -252,10 +256,6 @@ class asg(object):
                     marker = lcs.next_token
                 else:
                     break
-            self.__lc_find_cache = sorted(
-                self.__lc_find_cache,
-                key=lambda a: a.name, reverse=True
-            )
 
     def regex_configs(self, regex):
         """

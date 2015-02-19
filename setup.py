@@ -22,10 +22,10 @@ setup(
         "console_scripts": [
             "billow-list = billow.cli:billow_list",
             "billow-get = billow.cli:billow_get",
-            "billow-find-config= billow.cli:billow_find_config",
-            "billow-list-config= billow.cli:billow_list_config",
-            "billow-find-image= billow.cli:billow_find_image",
-            "billow-list-image= billow.cli:billow_list_image"
+            "billow-find-configs = billow.cli:billow_find_configs",
+            "billow-list-configs = billow.cli:billow_list_configs",
+            "billow-find-images = billow.cli:billow_find_images",
+            "billow-list-images = billow.cli:billow_list_images"
         ]
     }
 )
