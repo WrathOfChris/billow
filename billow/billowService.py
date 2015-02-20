@@ -6,6 +6,7 @@ from . import vpc
 import boto
 import datetime
 import pprint
+import billow
 from .billowGroup import billowGroup
 
 
@@ -25,7 +26,6 @@ class billowService(object):
         self.balancers = list()
 
         self.rawsgroups = None
-        self.rawelbs = None
 
         # service-env:region overrides passed in region
         if ':' in service:
@@ -68,77 +68,18 @@ class billowService(object):
             c['security']['groups'].append(self.sg_name(sg, request=True))
         c['security']['rules'] = self.security_rules
 
-        self.__load_elbs()
+        self.__load_balancers()
         c['load_balancers'] = dict()
-        for e in self.rawelbs:
-            c['load_balancers'][str(e.name)] = dict()
-            elb = c['load_balancers'][str(e.name)]
-            elb['groups'] = list()
-            for sg in e.security_groups:
-                elb['groups'].append(self.sg_name(sg, request=True))
-            if e.source_security_group:
-                elb['source_group'] = e.source_security_group.name
-            elb['zones'] = list()
-            for z in e.availability_zones:
-                elb['zones'].append(z)
-            elb['health'] = dict()
-            elb['health']['timeout'] = e.health_check.timeout
-            elb['health']['target'] = e.health_check.target
-            elb['health']['healthy'] = e.health_check.healthy_threshold
-            elb['health']['unhealthy'] = e.health_check.unhealthy_threshold
-            if e.scheme == u'internal':
-                elb['internal'] = True
-            elb['subnets'] = list()
-            for s in e.subnets:
-                elb['subnets'].append(self.vpc.subnet_name(s))
-
-            elb['policies'] = dict()
-            if e.policies.app_cookie_stickiness_policies:
-                elb['policies'][
-                    'app_cookie'] = e.policies.app_cookie_stickiness_policies.policy_name
-            if e.policies.lb_cookie_stickiness_policies:
-                elb['policies'][
-                    'lb_cookie'] = e.policies.lb_cookie_stickiness_policies.policy_name
-            if e.policies.other_policies:
-                elb['policies']['other'] = list()
-                for p in e.policies.other_policies:
-                    elb['policies']['other'].append(p.policy_name)
-
-            elb['listeners'] = list()
-            for l in e.listeners:
-                listener = {
-                    'from': l.load_balancer_port,
-                    'to': l.instance_port,
-                    'from_prot': l.protocol,
-                    'to_prot': l.instance_protocol
-                }
-                if l.ssl_certificate_id:
-                    listener['cert'] = self.lb_certname(l.ssl_certificate_id)
-                elb['listeners'].append(listener)
-
-            attrs = self.elb.get_elb_attr(e.name)
-            if attrs:
-                if attrs.cross_zone_load_balancing:
-                    if 'options' not in elb:
-                        elb['options'] = dict()
-                    elb['options']['crosszone'] = bool(
-                        attrs.cross_zone_load_balancing)
-                if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
-                    if 'options' not in elb:
-                        elb['options'] = dict()
-                    elb['options']['idletimeout'] = int(
-                        attrs.connecting_settings.idle_timeout)
-                # elb['options']['draining']
-                # elb['options']['accesslog']
+        for b in self.balancers:
+            c['load_balancers'][str(b.name)] = b.config()
 
         return self.__config
 
     def info(self):
         self.__info = self.config()
 
-        for e in self.rawelbs:
-            self.__info[self.service]['load_balancers'][
-                str(e.name)]['dns_name'] = e.dns_name
+        for b in self.balancers:
+            c['load_balancers'][str(b.name)] = b.info()
 
         self.__info[self.service]['groups'] = list()
         for g in self.groups:
@@ -225,13 +166,14 @@ class billowService(object):
         if not self.rawsgroups:
             self.rawsgroups = self.sec.get_groups(self.security_groups)
 
-    def __load_elbs(self):
-        if not self.rawelbs:
-            # Never query an empty list of ELBs
-            if self.load_balancers:
-                self.rawelbs = self.elb.get_elb(self.load_balancers)
-            else:
-                self.rawelbs = list()
+    def __load_balancers(self):
+        if not self.balancers:
+            for g in self.groups:
+                for lb in g.load_balancers:
+                    if lb not in self.balancers:
+                        b = billow.billowBalancer(lb, region=self.region,
+                                parent=self)
+                        self.balancers.append(b)
 
     @property
     def region(self):
@@ -270,12 +212,12 @@ class billowService(object):
 
     @property
     def security_groups(self):
-        self.__load_elbs()
+        self.__load_balancers()
         sgroups = list()
         for g in self.groups:
             sgroups.extend(x for x in g.security_groups if x not in sgroups)
-        for e in self.rawelbs:
-            sgroups.extend(x for x in e.security_groups if x not in sgroups)
+        for b in self.balancers:
+            sgroups.extend(x for x in b.security_groups if x not in sgroups)
         return sgroups
 
     def sg_name(self, sgid, request=False):
@@ -318,12 +260,10 @@ class billowService(object):
     @property
     def load_balancers(self):
         elbs = list()
-        for g in self.groups:
-            elbs.extend(x for x in g.load_balancers if x not in elbs)
+        __load_balancers()
+        for b in self.balancers:
+            elbs.append(b.name)
         return elbs
-
-    def lb_certname(self, cert):
-        return cert.split('/')[-1]
 
     def get_instance(self, instance):
         for g in self.groups:

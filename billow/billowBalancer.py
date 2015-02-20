@@ -1,0 +1,180 @@
+from . import asg
+from . import dns
+from . import elb
+from . import sec
+import boto
+import datetime
+
+
+class billowBalancer(object):
+
+    """
+    Load Balancer fronting a Group
+    """
+
+    def __init__(self, name, region='us-east-1', parent=None):
+        self.__name = name
+        self.region = region
+        self.rawelb = None
+        self.rawsgroups = None
+        self.parent = parent
+        self.update_time = None
+
+        # Backends
+        if self.parent:
+            self.elb = self.parent.elb
+            self.sec = self.parent.sec
+            self.vpc = self.parent.vpc
+        else:
+            self.elb = elb.elb(self.region)
+            self.sec = sec.sec(self.region)
+            self.vpc = vpc.vpc(self.region)
+
+    def config(self):
+        self.__load()
+
+        self.__config = dict()
+        elb = self.__config
+        e = self.rawelb
+
+        elb['name'] = self.name
+        elb['groups'] = list()
+        for sg in self.security_groups:
+            elb['groups'].append(self.sg_name(sg, request=True))
+        if e.source_security_group:
+            elb['source_group'] = e.source_security_group.name
+        elb['zones'] = list()
+        for z in e.availability_zones:
+            elb['zones'].append(z)
+        elb['health'] = dict()
+        elb['health']['timeout'] = e.health_check.timeout
+        elb['health']['target'] = e.health_check.target
+        elb['health']['healthy'] = e.health_check.healthy_threshold
+        elb['health']['unhealthy'] = e.health_check.unhealthy_threshold
+        if e.scheme == u'internal':
+            elb['internal'] = True
+        elb['subnets'] = list()
+        for s in e.subnets:
+            elb['subnets'].append(self.vpc.subnet_name(s))
+
+        elb['policies'] = dict()
+        if e.policies.app_cookie_stickiness_policies:
+            elb['policies'][
+                'app_cookie'] = e.policies.app_cookie_stickiness_policies.policy_name
+        if e.policies.lb_cookie_stickiness_policies:
+            elb['policies'][
+                'lb_cookie'] = e.policies.lb_cookie_stickiness_policies.policy_name
+        if e.policies.other_policies:
+            elb['policies']['other'] = list()
+            for p in e.policies.other_policies:
+                elb['policies']['other'].append(p.policy_name)
+
+        elb['listeners'] = list()
+        for l in e.listeners:
+            listener = {
+                'from': l.load_balancer_port,
+                'to': l.instance_port,
+                'from_prot': l.protocol,
+                'to_prot': l.instance_protocol
+            }
+            if l.ssl_certificate_id:
+                listener['cert'] = self.lb_certname(l.ssl_certificate_id)
+            elb['listeners'].append(listener)
+
+        attrs = self.elb.get_elb_attr(e.name)
+        if attrs:
+            if attrs.cross_zone_load_balancing:
+                if 'options' not in elb:
+                    elb['options'] = dict()
+                elb['options']['crosszone'] = bool(
+                    attrs.cross_zone_load_balancing)
+            if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
+                if 'options' not in elb:
+                    elb['options'] = dict()
+                elb['options']['idletimeout'] = int(
+                    attrs.connecting_settings.idle_timeout)
+            # elb['options']['draining']
+            # elb['options']['accesslog']
+
+        return self.__config
+
+    def info(self):
+        self.__info = self.config()
+        self.__info['dns_name'] = self.rawelb.dns_name
+
+        return self.__info
+
+    def __repr__(self):
+        """
+        billowBalancer(name:region)
+        """
+        return 'billowGroup(%s:%s)' % (self.name, self.region)
+
+    def __str__(self):
+        """
+        group
+        """
+        return '%s' % (self.name)
+
+    def __unicode__(self):
+        """
+        group
+        """
+        return u'%s' % (self.name)
+
+    def __eq__(self, other):
+        """
+        Match strings against 2 forms of balancer name:
+        1. balancer:region
+        2. balancer
+        """
+        if isinstance(other, str) or isinstance(other, unicode):
+            if "%s:%s" % (self.name, self.region) == other:
+                return True
+            return self.name == other
+        return self.name == other.name and \
+            self.region == other.region
+
+    def __load(self):
+        if not self.rawelb:
+            elbs = self.elb.get_elb(self.__name)
+            if elbs:
+                self.rawelb = elbs[0]
+
+    def __load_sgroups(self):
+        if not self.rawsgroups:
+            self.__load()
+            self.rawsgroups = self.sec.get_groups(self.rawelb.security_groups)
+
+    def lb_certname(self, cert):
+        return cert.split('/')[-1]
+
+    def sg_name(self, sgid, request=False):
+        self.__load_sgroups()
+        for sg in self.rawsgroups:
+            if sg.id == sgid:
+                return str(sg.name)
+        if request:
+            sg = self.sec.get_groups(sgid)
+            if sg:
+                self.rawsgroups.append(sg[0])
+                return str(sg[0].name)
+        return str(sgid)
+
+    @property
+    def name(self):
+        self.__load()
+        if self.rawelb:
+            return self.rawelb.name
+        else:
+            return self.__name
+
+    @property
+    def security_groups(self):
+        self.__load()
+        if not self.rawelb:
+            return list()
+        sgroups = list()
+        for g in self.rawelb.security_groups:
+            sgroups.append(g)
+        return sgroups
