@@ -126,7 +126,7 @@ class billowGroup(object):
             self.environ == other.environ and \
             self.cluster == other.cluster
 
-    def _load(self):
+    def __load(self):
         if not self.rawgroup:
             group = self.asg.get_groups(self.group)
             if len(group) == 1:
@@ -143,7 +143,7 @@ class billowGroup(object):
             elif t.key == self.tagcluster:
                 self.__cluster = t.value
 
-    def _load_config(self):
+    def __load_config(self):
         if not self.rawconfig:
             config = self.asg.get_configs(self.launch_config)
             if len(config) == 1:
@@ -155,11 +155,11 @@ class billowGroup(object):
         gathered elsewhere
         """
         self.rawgroup = rawgroup
-        self._load()
+        self.__load()
 
     def refresh(self):
         self.rawgroup = None
-        self._load()
+        self.__load()
 
     @property
     def region(self):
@@ -173,79 +173,79 @@ class billowGroup(object):
         if self.parent:
             return self.parent.service
         else:
-            self._load()
+            self.__load()
             return self.__service
 
     @property
     def environ(self):
         if not self.__environ:
-            self._load()
+            self.__load()
         return self.__environ
 
     @property
     def cluster(self):
         if not self.__cluster:
-            self._load()
+            self.__load()
         return self.__cluster
 
     @property
     def name(self):
-        self._load()
+        self.__load()
         return self.rawgroup.name
 
     @property
     def zones(self):
-        self._load()
+        self.__load()
         return self.rawgroup.availability_zones
 
     @property
     def cur_size(self):
-        self._load()
+        self.__load()
         return self.rawgroup.desired_capacity
 
     @property
     def health_check_period(self):
-        self._load()
+        self.__load()
         return self.rawgroup.health_check_period
 
     @property
     def health_check_type(self):
-        self._load()
+        self.__load()
         return self.rawgroup.health_check_type
 
     @property
     def launch_config(self):
-        self._load()
+        self.__load()
         return self.rawgroup.launch_config_name
 
     @property
     def config_ami(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.image_id
 
     @property
     def config_type(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.instance_type
 
     @property
     def config_userdata(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.user_data
 
     @property
     def config_keypair(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.key_name
 
     @property
     def config_role(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.instance_profile_name
 
     @property
     def load_balancers(self):
-        self._load()
+        self.__load()
         elbs = list()
         for lb in self.rawgroup.load_balancers:
             elbs.append(lb)
@@ -253,22 +253,22 @@ class billowGroup(object):
 
     @property
     def min_size(self):
-        self._load()
+        self.__load()
         return self.rawgroup.min_size
 
     @property
     def max_size(self):
-        self._load()
+        self.__load()
         return self.rawgroup.max_size
 
     @property
     def placement_group(self):
-        self._load()
+        self.__load()
         return self.rawgroup.placement_group
 
     @property
     def subnets(self):
-        self._load()
+        self.__load()
         subnets = list()
         for s in self.rawgroup.vpc_zone_identifier.split(','):
             subnets.append(s)
@@ -276,7 +276,7 @@ class billowGroup(object):
 
     @property
     def tags(self):
-        self._load()
+        self.__load()
         tags = list()
         for t in self.rawgroup.tags:
             tags.append({t.key: t.value})
@@ -331,7 +331,7 @@ class billowGroup(object):
 
     @property
     def instancestatus(self):
-        self._load()
+        self.__load()
         instances = list()
         for i in self.rawgroup.instances:
             instances.append(self.__make_instance_group(i))
@@ -339,7 +339,7 @@ class billowGroup(object):
 
     @property
     def instances(self):
-        self._load()
+        self.__load()
         instances = dict()
         for i in self.rawgroup.instances:
             instances[i.instance_id] = self.__make_instance_group(i)
@@ -355,7 +355,7 @@ class billowGroup(object):
         return instances.values()
 
     def get_instance(self, instance):
-        self._load()
+        self.__load()
         inst = None
         for i in self.rawgroup.instances:
             if i.instance_id == instance:
@@ -373,12 +373,12 @@ class billowGroup(object):
 
     @property
     def arn(self):
-        self._load()
+        self.__load()
         return self.rawgroup.autoscaling_group_arn
 
     @property
     def suspended_processes(self):
-        self._load()
+        self.__load()
         suspended_processes = list()
         for sp in self.rawgroup.suspended_processes:
             suspended_processes.append(sp.process_name)
@@ -386,7 +386,7 @@ class billowGroup(object):
 
     @property
     def security_groups(self):
-        self._load_config()
+        self.__load_config()
         sgroups = list()
         for sg in self.rawconfig.security_groups:
             sgroups.append(sg)
@@ -394,7 +394,7 @@ class billowGroup(object):
 
     @property
     def public(self):
-        self._load_config()
+        self.__load_config()
         return self.rawconfig.associate_public_ip_address
 
     # addrs

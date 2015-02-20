@@ -182,14 +182,14 @@ class billowService(object):
             self.environ == other.environ and \
             self.region == other.region
 
-    def _load(self):
+    def __load(self):
         print "loading..."
-        self._load_groups()
+        self.__load_groups()
 
         # preserve update time for future caching decisions
         self.update_time = datetime.datetime.utcnow()
 
-    def _load_groups(self):
+    def __load_groups(self):
         groupnames = list()
         groups = list()
         baseservice = None
