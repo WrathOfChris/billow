@@ -126,8 +126,10 @@ class billowGroup(object):
             self.environ == other.environ and \
             self.cluster == other.cluster
 
-    def __load(self):
-        if not self.rawgroup:
+    def __load(self, refresh=False):
+        if not self.rawgroup or refresh:
+            self.rawgroup = None
+
             group = self.asg.get_groups(self.group)
             if len(group) == 1:
                 self.rawgroup = group[0]
@@ -148,6 +150,9 @@ class billowGroup(object):
             config = self.asg.get_configs(self.launch_config)
             if len(config) == 1:
                 self.rawconfig = config[0]
+
+    def refresh(self):
+        self.__load(refresh=True)
 
     def push(self, rawgroup):
         """

@@ -124,7 +124,6 @@ class billowService(object):
             self.region == other.region
 
     def __load(self):
-        print "loading..."
         self.__load_groups()
 
         # preserve update time for future caching decisions
@@ -162,18 +161,36 @@ class billowService(object):
 
         self.groups = groups
 
-    def __load_sgroups(self):
-        if not self.rawsgroups:
+    def __load_sgroups(self, refresh=False):
+        if not self.rawsgroups or refresh:
             self.rawsgroups = self.sec.get_groups(self.security_groups)
 
-    def __load_balancers(self):
-        if not self.balancers:
+    def __load_balancers(self, refresh=False):
+        if not self.balancers or refresh:
+            self.balancers = list()
             for g in self.groups:
                 for lb in g.load_balancers:
                     if lb not in self.balancers:
                         b = billow.billowBalancer(lb, region=self.region,
                                 parent=self)
                         self.balancers.append(b)
+
+    def refresh(self):
+        self.__load()
+        self.__load_groups()
+        self.__load_sgroups(refresh=True)
+        self.__load_balancers(refresh=True)
+
+    def add_group(self, groupname):
+        """
+        Add a group to the service by name
+        """
+        if not isinstance(groupname, basestring):
+            raise TypeError
+        if groupname not in self.groups:
+            self.groups.append(
+                    billowGroup(groupname, region=self.region, parent=self)
+                    )
 
     @property
     def region(self):
@@ -260,7 +277,7 @@ class billowService(object):
     @property
     def load_balancers(self):
         elbs = list()
-        __load_balancers()
+        self.__load_balancers()
         for b in self.balancers:
             elbs.append(b.name)
         return elbs

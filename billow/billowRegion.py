@@ -84,16 +84,13 @@ class billowRegion(object):
             slist = [s]
 
         if len(slist) > 1:
-            sys.stderr.write(
-                "ignoring multiple services found for %s/%s\n" % (service, environ))
+            sys.stderr.write("ignoring multiple services found for %s/%s\n" % \
+                    (service, environ))
 
-        s = slist[0]
         if group:
-            if group not in s.groups:
-                s.groups.append(billowGroup(group, region=self.region,
-                                            parent=s))
+            slist[0].add_group(group)
 
-        return s
+        return slist[0]
 
     def canon_service(self, service):
         if ':' in service:
