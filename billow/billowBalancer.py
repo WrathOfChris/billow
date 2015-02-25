@@ -17,6 +17,7 @@ class billowBalancer(object):
         self.region = region
         self.rawelb = None
         self.rawsgroups = None
+        self.rawattrs = None
         self.parent = parent
         self.update_time = None
 
@@ -135,16 +136,26 @@ class billowBalancer(object):
         return self.name == other.name and \
             self.region == other.region
 
-    def __load(self):
-        if not self.rawelb:
+    def __load(self, refresh=False):
+        if not self.rawelb or refresh:
             elbs = self.elb.get_elb(self.__name)
             if elbs:
                 self.rawelb = elbs[0]
 
-    def __load_sgroups(self):
-        if not self.rawsgroups:
+    def __load_sgroups(self, refresh=False):
+        if not self.rawsgroups or refresh:
             self.__load()
             self.rawsgroups = self.sec.get_groups(self.rawelb.security_groups)
+
+    def __load_attrs(self, refresh=False):
+        if not self.rawattrs or refresh:
+            self.__load()
+            self.rawattrs = self.elb.get_elb_attr(self.__name)
+
+    def refresh(self):
+        self.__load(refresh=True)
+        self.__load_sgroups(refresh=True)
+        self.__load_attrs(refresh=True)
 
     def lb_certname(self, cert):
         return cert.split('/')[-1]
@@ -178,3 +189,31 @@ class billowBalancer(object):
         for g in self.rawelb.security_groups:
             sgroups.append(g)
         return sgroups
+
+    @property
+    def options(self):
+        self.__load_attrs()
+        options = {
+                'crosszone': self.rawattrs.cross_zone_load_balancing.enabled,
+                'idletimeout': self.rawattrs.connecting_settings.idle_timeout,
+                'draining': {
+                    'enabled': self.rawattrs.connection_draining.enabled,
+                    'timeout': self.rawattrs.connection_draining.timeout
+                    },
+                'accesslog': {
+                    'enabled': self.rawattrs.access_log.enabled,
+                    's3_bucket_name': self.rawattrs.access_log.s3_bucket_name,
+                    's3_bucket_prefix': \
+                            self.rawattrs.access_log.s3_bucket_prefix,
+                    'emit_interval': self.rawattrs.access_log.emit_interval
+                    }
+                }
+        return options
+
+    @property
+    def zones(self):
+        self.__load()
+        zonelist = list()
+        for z in self.rawelb.availability_zones:
+            zonelist.append(z)
+        return zonelist
