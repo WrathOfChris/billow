@@ -193,6 +193,33 @@ class asg(object):
 
         return instances
 
+    def get_instance_status(self, instance_ids, filters=None):
+        """
+        get Instance Status' in a region
+        """
+        statuses = list()
+        marker = None
+        self.__connect_ec2()
+
+        if not isinstance(instance_ids, list):
+            instance_ids = [instance_ids]
+
+        while True:
+            s = self.aws.wrap(
+                self.ec2.get_all_instance_status,
+                instance_ids=instance_ids,
+                include_all_instances=True,
+                filters=filters,
+                next_token=marker
+            )
+            statuses.extend(s)
+            if s.next_token:
+                marker = s.next_token
+            else:
+                break
+
+        return statuses
+
     def match_images_name(self, name):
         """
         match Images in a region.
@@ -282,3 +309,16 @@ class asg(object):
                 configs.append(lc)
 
         return configs
+
+    def terminate(self, instance_id, decrement_capacity=True):
+        """
+        Terminate instance within an asg object
+        """
+
+        ret = self.aws.wrap(
+            self.asg.terminate_instance,
+            instance_id=instance_id,
+            decrement_capacity=decrement_capacity
+        )
+
+        return ret
