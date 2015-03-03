@@ -25,7 +25,13 @@ setup(
             "billow-find-configs = billow.cli:billow_find_configs",
             "billow-list-configs = billow.cli:billow_list_configs",
             "billow-find-images = billow.cli:billow_find_images",
-            "billow-list-images = billow.cli:billow_list_images"
+            "billow-list-images = billow.cli:billow_list_images",
+            "billow-list-rotate = billow.cli:billow_list_rotate",
+            "billow-rotate = billow.cli:billow_rotate",
+            "billow-rotate-deregister = billow.cli:billow_rotate_deregister",
+            "billow-rotate-instance = billow.cli:billow_rotate_instance",
+            "billow-rotate-register = billow.cli:billow_rotate_register",
+            "billow-rotate-terminate = billow.cli:billow_rotate_terminate"
         ]
     }
 )

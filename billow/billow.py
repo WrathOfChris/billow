@@ -8,5 +8,7 @@ from .billowCloud import billowCloud
 from .billowConfig import billowConfig
 from .billowEndpoint import billowEndpoint
 from .billowImage import billowImage
+from .billowInstance import billowInstance
 from .billowRegion import billowRegion
+from .billowRotate import billowRotate
 from .billowService import billowService

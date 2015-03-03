@@ -4,6 +4,7 @@ from . import elb
 from . import sec
 import boto
 import datetime
+import billow
 
 
 class billowBalancer(object):
@@ -18,6 +19,7 @@ class billowBalancer(object):
         self.rawelb = None
         self.rawsgroups = None
         self.rawattrs = None
+        self.rawhealth = None
         self.parent = parent
         self.update_time = None
 
@@ -82,20 +84,7 @@ class billowBalancer(object):
                 listener['cert'] = self.lb_certname(l.ssl_certificate_id)
             elb['listeners'].append(listener)
 
-        attrs = self.elb.get_elb_attr(e.name)
-        if attrs:
-            if attrs.cross_zone_load_balancing:
-                if 'options' not in elb:
-                    elb['options'] = dict()
-                elb['options']['crosszone'] = bool(
-                    attrs.cross_zone_load_balancing)
-            if attrs.connecting_settings.idle_timeout != self.elb.default_idle_timeout:
-                if 'options' not in elb:
-                    elb['options'] = dict()
-                elb['options']['idletimeout'] = int(
-                    attrs.connecting_settings.idle_timeout)
-            # elb['options']['draining']
-            # elb['options']['accesslog']
+        elb['options'] = self.options
 
         return self.__config
 
@@ -152,10 +141,16 @@ class billowBalancer(object):
             self.__load()
             self.rawattrs = self.elb.get_elb_attr(self.__name)
 
+    def __load_health(self, refresh=False):
+        if not self.rawhealth or refresh:
+            self.__load()
+            self.rawhealth = self.elb.get_health(self.__name)
+
     def refresh(self):
         self.__load(refresh=True)
         self.__load_sgroups(refresh=True)
         self.__load_attrs(refresh=True)
+        self.__load_health(refresh=True)
 
     def lb_certname(self, cert):
         return cert.split('/')[-1]
@@ -217,3 +212,49 @@ class billowBalancer(object):
         for z in self.rawelb.availability_zones:
             zonelist.append(z)
         return zonelist
+
+    @property
+    def instances(self):
+        self.__load_health()
+        instances = list()
+        for h in self.rawhealth:
+            inst = billow.billowInstance(h.instance_id, region=self.region)
+            inst.push_balancer_info(h)
+            instances.append(inst)
+        return instances
+
+    def deregister(self, instance_id):
+        if instance_id not in self.instances:
+            print "XXX instance not found in balancer"
+            return False
+        ret = self.elb.deregister(self.name, instance_id)
+        # XXX ret is instance list of current instances
+        # XXX update instancelist?
+        return True
+
+    def register(self, instance_id):
+        if instance_id in self.instances:
+            print "XXX instance already exists in balancer"
+            return False
+        ret = self.elb.register(self.name, instance_id)
+        return ret
+
+    @property
+    def health_target(self):
+        self.__load()
+        return self.rawelb.health_check.target
+
+    @property
+    def health_timeout(self):
+        self.__load()
+        return self.rawelb.health_check.timeout
+
+    @property
+    def health_threshold(self):
+        self.__load()
+        return self.rawelb.health_check.healthy_threshold
+
+    @property
+    def health_unhealthy_threshold(self):
+        self.__load()
+        return self.rawelb.health_check.unhealthy_threshold

@@ -83,3 +83,54 @@ class elb(object):
         )
 
         return attr
+
+    def get_health(self, name, instances=None):
+        """
+        get Instance health
+        """
+        if instances and not isinstance(instances, list):
+            instances = [instances]
+
+        self._connect()
+
+        instancelist = self.aws.wrap(
+            self.elb.describe_instance_health,
+            load_balancer_name=name,
+            instances=instances
+        )
+
+        return instancelist
+
+    def deregister(self, name, instances):
+        """
+        deregister instances from ELB
+        """
+        if instances and not isinstance(instances, list):
+            instances = [instances]
+
+        self._connect()
+
+        instancelist = self.aws.wrap(
+            self.elb.deregister_instances,
+            load_balancer_name=name,
+            instances=instances
+        )
+
+        return instancelist
+
+    def register(self, name, instances):
+        """
+        register instances to ELB
+        """
+        if instances and not isinstance(instances, list):
+            instances = [instances]
+
+        self._connect()
+
+        instancelist = self.aws.wrap(
+            self.elb.register_instances,
+            load_balancer_name=name,
+            instances=instances
+        )
+
+        return instancelist

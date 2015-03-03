@@ -4,6 +4,7 @@ from . import elb
 from . import sec
 import boto
 import datetime
+import billow
 
 
 class billowGroup(object):
@@ -17,6 +18,7 @@ class billowGroup(object):
         self.rawgroup = None
         self.rawconfig = None
         self.rawinstances = None
+        self.rawstatus = None
         self.__region = region
         self.__service = None
         self.__environ = None
@@ -54,7 +56,7 @@ class billowGroup(object):
         if self.cluster and self.cluster != self.parent.cluster:
             self.__config['cluster'] = self.cluster
 
-        self.__config['load_balancers'] = self.load_balancers
+        self.__config['balancers'] = self.load_balancers
 
         self.__config['size'] = dict()
         self.__config['size']['cur'] = self.cur_size
@@ -96,7 +98,7 @@ class billowGroup(object):
         self.__info['instances'] = list()
         instances = self.instances
         for i in instances:
-            self.__info['instances'].append(i)
+            self.__info['instances'].append(dict(i))
         return self.__info
 
     def __repr__(self):
@@ -150,6 +152,13 @@ class billowGroup(object):
             config = self.asg.get_configs(self.launch_config)
             if len(config) == 1:
                 self.rawconfig = config[0]
+
+    def __load_status(self):
+        instids = list()
+        for i in self.rawgroup.instances:
+            instids.append(i.instance_id)
+        if not self.rawstatus:
+            self.rawstatus = self.asg.get_instance_status(instids)
 
     def refresh(self):
         self.__load(refresh=True)
@@ -287,94 +296,59 @@ class billowGroup(object):
             tags.append({t.key: t.value})
         return tags
 
-    def __make_instance_group(self, instance):
-        """
-        Make instance dict from boto autoscale instance object
-        """
-        return {
-            'id': instance.instance_id,
-            'health': instance.health_status,
-            'config': instance.launch_config_name,
-            'state': instance.lifecycle_state,
-            'zone': instance.availability_zone
-        }
-
-    def __make_instance(self, instance):
-        """
-        Make instance dict from boto instance object
-        """
-        i = {
-            # id, health, config, state, zone
-            'architecture': instance.architecture,
-            'ebs_optimized': instance.ebs_optimized,
-            'public_dns_name': instance.public_dns_name,
-            'private_dns_name': instance.private_dns_name,
-            'image_id': instance.image_id,
-            'instance_type': instance.instance_type,
-            'public_ip_address': instance.ip_address,
-            'private_ip_address': instance.private_ip_address,
-            'key_name': instance.key_name,
-            'launch_time': instance.launch_time,
-            'instance_state': instance.state,
-            'subnet_id': instance.subnet_id,
-            'virtualization_type': instance.virtualization_type,
-            'vpc_id': instance.vpc_id
-        }
-        if instance.instance_profile and 'arn' in instance.instance_profile:
-            i['instance_profile'] = instance.instance_profile['arn']
-
-        if instance.tags:
-            i['tags'] = dict()
-            for tname, tvalue in instance.tags.iteritems():
-                i['tags'][tname] = tvalue
-
-        i['groups'] = list()
-        for g in instance.groups:
-            i['groups'].append(g.id)
-
-        return i
-
     @property
     def instancestatus(self):
         self.__load()
         instances = list()
         for i in self.rawgroup.instances:
-            instances.append(self.__make_instance_group(i))
+            inst = billow.billowInstance(i.instance_id, region=self.region)
+            inst.push_group_info(i)
+            instances.append(inst)
+        return instances
+
+    @property
+    def status(self):
+        self.__load()
+        self.__load_status()
+        instances = list()
+        for i in self.rawgroup.instances:
+            inst = billow.billowInstance(i.instance_id, region=self.region)
+            inst.push_group_info(i)
+            for s in self.rawstatus:
+                if s.id == i.instance_id:
+                    inst.push_status_info(s)
+                    break
+            instances.append(inst)
         return instances
 
     @property
     def instances(self):
         self.__load()
-        instances = dict()
+        instances = list()
+        ids = list()
         for i in self.rawgroup.instances:
-            instances[i.instance_id] = self.__make_instance_group(i)
+            inst = billow.billowInstance(i.instance_id, region=self.region)
+            inst.push_group_info(i)
+            instances.append(inst)
+            ids.append(inst.id)
 
         # No instances found, do not bother looking for info
         if not instances:
             return list()
 
-        self.rawinstances = self.asg.get_instance(instances.keys())
-        for i in self.rawinstances:
-            instances[i.id].update(self.__make_instance(i))
+        self.rawinstances = self.asg.get_instance(ids)
+        for ri in self.rawinstances:
+            for i in instances:
+                if i.id == ri.id:
+                    i.push_instance_info(ri)
 
-        return instances.values()
+        return instances
 
     def get_instance(self, instance):
         self.__load()
-        inst = None
-        for i in self.rawgroup.instances:
-            if i.instance_id == instance:
-                inst = self.__make_instance_group(i)
-
-        # Only return instance info if the instance is part of a group
-        if not inst:
-            return None
-
-        rawinst = self.asg.get_instance(instance)
-        if len(rawinst) != 1:
-            return None
-        inst.update(self.__make_instance(rawinst[0]))
-        return inst
+        for i in self.instances:
+            if i == instance:
+                return i
 
     @property
     def arn(self):
@@ -401,6 +375,13 @@ class billowGroup(object):
     def public(self):
         self.__load_config()
         return self.rawconfig.associate_public_ip_address
+
+    def terminate(self, instance_id, decrement_capacity=True):
+        self.__load()
+        return self.asg.terminate(
+                instance_id,
+                decrement_capacity=decrement_capacity
+                )
 
     # addrs
     # aminame

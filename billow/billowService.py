@@ -20,10 +20,10 @@ class billowService(object):
                  parent=None):
         self.service = service
         self.environ = environ
-        self.groups = groups
+        self.__groups = groups
         self.__region = region
         self.parent = parent
-        self.balancers = list()
+        self.__balancers = list()
 
         self.rawsgroups = None
 
@@ -50,8 +50,7 @@ class billowService(object):
 
     def config(self):
         self.__config = dict()
-        self.__config[self.service] = dict()
-        c = self.__config[self.service]
+        c = self.__config
         c['region'] = self.region
         c['service'] = self.service
         c['environ'] = self.environ
@@ -69,9 +68,9 @@ class billowService(object):
         c['security']['rules'] = self.security_rules
 
         self.__load_balancers()
-        c['load_balancers'] = dict()
+        c['balancers'] = dict()
         for b in self.balancers:
-            c['load_balancers'][str(b.name)] = b.config()
+            c['balancers'][str(b.name)] = b.config()
 
         return self.__config
 
@@ -79,11 +78,11 @@ class billowService(object):
         self.__info = self.config()
 
         for b in self.balancers:
-            c['load_balancers'][str(b.name)] = b.info()
+            self.__info['balancers'][str(b.name)] = b.info()
 
-        self.__info[self.service]['groups'] = list()
+        self.__info['groups'] = list()
         for g in self.groups:
-            self.__info[self.service]['groups'].append(g.info())
+            self.__info['groups'].append(g.info())
 
         return self.__info
 
@@ -129,7 +128,10 @@ class billowService(object):
         # preserve update time for future caching decisions
         self.update_time = datetime.datetime.utcnow()
 
-    def __load_groups(self):
+    def __load_groups(self, refresh=False):
+        if self.__groups or not refresh:
+            return
+
         groupnames = list()
         groups = list()
         baseservice = None
@@ -159,21 +161,21 @@ class billowService(object):
                 print "XXX throw away environ %s" % g.environ
                 groups.remove(g)
 
-        self.groups = groups
+        self.__groups = groups
 
     def __load_sgroups(self, refresh=False):
         if not self.rawsgroups or refresh:
             self.rawsgroups = self.sec.get_groups(self.security_groups)
 
     def __load_balancers(self, refresh=False):
-        if not self.balancers or refresh:
-            self.balancers = list()
+        if not self.__balancers or refresh:
+            self.__balancers = list()
             for g in self.groups:
                 for lb in g.load_balancers:
-                    if lb not in self.balancers:
+                    if lb not in self.__balancers:
                         b = billow.billowBalancer(lb, region=self.region,
                                 parent=self)
-                        self.balancers.append(b)
+                        self.__balancers.append(b)
 
     def refresh(self):
         self.__load()
@@ -188,7 +190,7 @@ class billowService(object):
         if not isinstance(groupname, basestring):
             raise TypeError
         if groupname not in self.groups:
-            self.groups.append(
+            self.__groups.append(
                     billowGroup(groupname, region=self.region, parent=self)
                     )
 
@@ -275,9 +277,18 @@ class billowService(object):
         return srules
 
     @property
+    def balancers(self):
+        self.__load_balancers()
+        return self.__balancers
+
+    @property
+    def groups(self):
+        self.__load_groups()
+        return self.__groups
+
+    @property
     def load_balancers(self):
         elbs = list()
-        self.__load_balancers()
         for b in self.balancers:
             elbs.append(b.name)
         return elbs
