@@ -322,3 +322,17 @@ class asg(object):
         )
 
         return ret
+
+    def set_capacity(self, group_name, desired_capacity, honor_cooldown=False):
+        """
+        Set Desired Capacity for an AutoScaleGroup
+        """
+
+        ret = self.aws.wrap(
+            self.asg.set_desired_capacity,
+            group_name=group_name,
+            desired_capacity=desired_capacity,
+            honor_cooldown=honor_cooldown
+        )
+
+        return ret
