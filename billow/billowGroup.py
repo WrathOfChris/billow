@@ -383,6 +383,20 @@ class billowGroup(object):
                 decrement_capacity=decrement_capacity
                 )
 
+    def increment(self):
+        self.refresh()
+        return self.asg.set_capacity(
+                self.group,
+                self.cur_size + 1
+                )
+
+    def decrement(self):
+        self.refresh()
+        return self.asg.set_capacity(
+                self.group,
+                max(0, self.cur_size - 1)
+                )
+
     # addrs
     # aminame
     # intaddrs
