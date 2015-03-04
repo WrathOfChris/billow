@@ -258,3 +258,15 @@ class billowBalancer(object):
     def health_unhealthy_threshold(self):
         self.__load()
         return self.rawelb.health_check.unhealthy_threshold
+
+    @property
+    def connection_draining(self):
+        self.__load()
+        self.__load_attrs()
+        return self.rawattrs.connection_draining.enabled
+
+    @property
+    def connection_draining_timeout(self):
+        self.__load()
+        self.__load_attrs()
+        return self.rawattrs.connection_draining.timeout
