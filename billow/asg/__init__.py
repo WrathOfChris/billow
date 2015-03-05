@@ -336,3 +336,85 @@ class asg(object):
         )
 
         return ret
+
+    def disassociate_address(self, association_id):
+        """
+        Disassociate an address from an instance
+        """
+
+        ret = self.aws.wrap(
+            self.ec2.disassociate_address,
+            association_id=association_id
+            )
+
+        return ret
+
+    def associate_address(self, allocation_id, instance_id=None,
+            network_interface_id=None, allow_reassociation=False):
+        """
+        Associate an address to an instance
+        """
+
+        # When using an Allocation ID, make sure to pass None for public_ip
+        ret = self.aws.wrap(
+            self.ec2.associate_address,
+            public_ip=None,
+            allocation_id=allocation_id,
+            instance_id=instance_id,
+            network_interface_id=network_interface_id,
+            allow_reassociation=allow_reassociation
+            )
+
+        return ret
+
+    def unassign_private_ip_addresses(self, network_interface_id=None,
+            private_ip_addresses=None):
+        """
+        UnAssign a private address from an instance
+        """
+
+        ret = self.aws.wrap(
+            self.ec2.unassign_private_ip_addresses,
+            network_interface_id=None,
+            private_ip_addresses=None
+            )
+
+        return ret
+
+    def assign_private_ip_addresses(self, network_interface_id=None,
+            private_ip_addresses=None, allow_reassignment=False):
+        """
+        Assign a private address to an instance
+        """
+
+        ret = self.aws.wrap(
+            self.ec2.assign_private_ip_addresses,
+            network_interface_id=None,
+            private_ip_addresses=None,
+            allow_reassignment=False
+            )
+
+        return ret
+
+    def list_activities(self, group, max_records=None):
+        """
+        list all AutoScaleGroup activities
+        """
+        self.activities = list()
+        marker = None
+        self.__connect()
+
+        while True:
+            activities = self.aws.wrap(
+                self.asg.get_all_activities,
+                autoscale_group=group,
+                max_records=max_records,
+                next_token=marker
+            )
+            self.activities.extend(activities)
+            if activities.next_token:
+                marker = activities.next_token
+            else:
+                break
+
+        return self.activities
