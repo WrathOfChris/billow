@@ -19,6 +19,7 @@ class billowGroup(object):
         self.rawconfig = None
         self.rawinstances = None
         self.rawstatus = None
+        self.rawevents = None
         self.__region = region
         self.__service = None
         self.__environ = None
@@ -159,6 +160,10 @@ class billowGroup(object):
             instids.append(i.instance_id)
         if not self.rawstatus:
             self.rawstatus = self.asg.get_instance_status(instids)
+
+    def __load_events(self, refresh=False):
+        if not self.rawevents or refresh:
+            self.rawevents = self.asg.list_activities(self.group)
 
     def refresh(self):
         self.__load(refresh=True)
@@ -396,6 +401,25 @@ class billowGroup(object):
                 self.group,
                 max(0, self.cur_size - 1)
                 )
+
+    @property
+    def events(self):
+        self.__load_events()
+        events = list()
+        for e in self.rawevents:
+            event = {
+                    'start_time': e.start_time,
+                    'end_time': e.end_time,
+                    'id': e.activity_id,
+                    'progress': e.progress,
+                    'status': e.status_code,
+                    'description': e.description,
+                    'cause': e.cause,
+                    'status_message': e.status_message,
+                    'group': e.group_name
+                    }
+            events.append(event)
+        return events
 
     # addrs
     # aminame

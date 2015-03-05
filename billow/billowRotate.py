@@ -148,6 +148,13 @@ class billowRotate(object):
                 return i
         return None
 
+    def wait_timeout(self, timeout, starttime):
+        waittime = timeout - (time.time() - starttime)
+        if waittime <= 0:
+            self.log('timed out, aborting')
+            return 0
+        return waittime
+
     def wait_elb_registered(self, instance_id, sleep=5, timeout=None):
         """
         Wait for instance to become registered to balancer
@@ -156,6 +163,9 @@ class billowRotate(object):
         """
         starttime = 0
         if timeout:
+            if timeout < 0:
+                self.log('timed out waiting for balancer registration')
+                return False
             starttime = time.time()
 
         healthy = False
@@ -197,7 +207,8 @@ class billowRotate(object):
             if not healthy:
                 timeoutstr = ''
                 if timeout:
-                    timeoutstr = ' timeout %ds'
+                    timeoutstr = ' timeout %ds' \
+                            % int(timeout - (time.time() - starttime))
                 self.log('sleeping %ds waiting for instance %s to register ' \
                         'with %d/%d balancers%s' % (
                             sleep,
@@ -217,10 +228,15 @@ class billowRotate(object):
         """
         starttime = 0
         if timeout:
+            if timeout < 0:
+                self.log('timed out waiting for balancer deregistration')
+                return False
             starttime = time.time()
 
         healthy = True
         while healthy:
+            drainmax = 0
+
             group = self.find_group_by_instance(instance_id)
             if not group:
                 self.log('no group found, cannot wait for instance %s ' \
@@ -244,8 +260,19 @@ class billowRotate(object):
                     unhealthycnt += 1
                     continue
 
-                if instance.balancer_state == 'Unknown':
+                if (balancer.connection_draining and \
+                        instance.balancer_state == 'InService: Instance ' \
+                        'deregistration currently in progress'):
+                    drainmax = max(drainmax,
+                            balancer.connection_draining_timeout)
+
+                if (instance.balancer_state == 'OutOfService' or \
+                        instance.balancer_state == 'OutOfService: Instance ' \
+                            'is not currently registered with the '
+                            'LoadBalancer' or \
+                         instance.balancer_state == 'Unknown'):
                     unhealthycnt += 1
+                    continue
 
             if unhealthycnt == len(group.load_balancers):
                 return True
@@ -258,21 +285,31 @@ class billowRotate(object):
             if healthy:
                 timeoutstr = ''
                 if timeout:
-                    timeoutstr = ' timeout %ds'
+                    timeoutstr = ' timeout %ds' \
+                            % int(timeout - (time.time() - starttime))
+                drainstr = ''
+                if drainmax:
+                    drainstr = ' draining connections %ds' % drainmax
                 self.log('sleeping %ds waiting for instance %s to ' \
-                        'deregister with %d/%d balancers%s' % (
+                        'deregister with %d/%d balancers%s%s' % (
                             sleep,
                             instance_id,
                             unhealthycnt,
                             len(group.load_balancers),
-                            timeoutstr)
+                            timeoutstr,
+                            drainstr)
                         )
                 time.sleep(sleep)
 
         return True
 
     def wait_elb_healthy(self, instance_id, sleep=5, timeout=None):
-        starttime = time.time()
+        if timeout:
+            if timeout < 0:
+                self.log('timed out waiting for balancer health check')
+                return False
+            starttime = time.time()
+
         healthchecks = dict()
         healthtimes = dict()
         healthy = False
@@ -318,7 +355,8 @@ class billowRotate(object):
             if not healthy:
                 timeoutstr = ''
                 if timeout:
-                    timeoutstr = ' timeout %ds'
+                    timeoutstr = ' timeout %ds' \
+                            % int(timeout - (time.time() - starttime))
                 self.log('sleeping %ds waiting for instance %s health check ' \
                         'with %d/%d balancers%s' % (
                             sleep,
@@ -343,6 +381,9 @@ class billowRotate(object):
         """
         starttime = 0
         if timeout:
+            if timeout < 0:
+                self.log('timed out waiting for instance group termination')
+                return False
             starttime = time.time()
 
         healthy = True
@@ -371,7 +412,8 @@ class billowRotate(object):
 
             timeoutstr = ''
             if timeout:
-                timeoutstr = ' timeout %ds'
+                timeoutstr = ' timeout %ds' \
+                        % int(timeout - (time.time() - starttime))
             self.log('sleeping %ds waiting for instance %s in state %s to ' \
                     'terminate from group %s%s' % (
                         sleep,
@@ -394,6 +436,9 @@ class billowRotate(object):
 
         starttime = 0
         if timeout:
+            if timeout < 0:
+                self.log('timed out waiting for instance group launch')
+                return False
             starttime = time.time()
 
         healthy = False
@@ -444,7 +489,8 @@ class billowRotate(object):
 
             timeoutstr = ''
             if timeout:
-                timeoutstr = ' timeout %ds' % timeout
+                timeoutstr = ' timeout %ds' \
+                        % int(timeout - (time.time() - starttime))
             statestr = ''
             if healthytext:
                 statestr = ' in state %s' % healthytext
@@ -461,7 +507,49 @@ class billowRotate(object):
 
         return list()
 
-    def deregister(self, instance_id, wait=True):
+    def wait_launch(self, group, instlist, timeout=None):
+        """
+        Wait for a newly launched instance to come into service
+        """
+        if timeout and timeout < 0:
+            self.log('timed out waiting for instance launch')
+            return False
+
+        # Wait for new instance to enter Group
+        ret = self.wait_group_launched(group, instlist, timeout=timeout)
+        if not ret:
+            return False
+
+        # Wait for all instances to register with Balancer
+        for i in ret:
+            if not self.wait_elb_registered(i, timeout=timeout):
+                return False
+
+        # Wait for all instances to pass health checks
+        for i in ret:
+            if not self.wait_elb_healthy(i, timeout=timeout):
+                return False
+
+        return True
+
+    def launch(self, group, wait=True, timeout=None):
+        """
+        launch a new instance
+        """
+        # Capture current group list to detect new instance
+        instlist = group.instances
+
+        if not group.increment():
+            self.log('group launch instance failed')
+            return False
+
+        if wait:
+            if not self.wait_lauch(group, instlist, timeout=timeout):
+                return False
+
+        return True
+
+    def deregister(self, instance_id, wait=True, timeout=None):
         ret = True
         for b in self.service.balancers:
             if instance_id not in b.instances:
@@ -472,12 +560,15 @@ class billowRotate(object):
                 ret = False
 
         if wait:
-            if not self.wait_elb_deregistered(instance_id):
+            if not self.wait_elb_deregistered(instance_id, timeout=timeout):
                 ret = False
 
         return ret
 
-    def register(self, instance_id, wait=True, healthy=False):
+    def register(self, instance_id, wait=True, healthy=False, timeout=None):
+        if timeout:
+            starttime = time.time()
+
         ret = True
         group = self.find_group_by_instance(instance_id)
         if not group:
@@ -496,16 +587,22 @@ class billowRotate(object):
                 ret = False
 
         if wait:
-            if not self.wait_elb_registered(instance_id):
+            waittime = timeout
+            if timeout:
+                waittime = self.wait_timeout(timeout, starttime)
+            if not self.wait_elb_registered(instance_id, timeout=waittime):
                 ret = False
 
             if healthy:
-                if not self.wait_elb_healthy(instance_id):
+                if timeout:
+                    waittime = self.wait_timeout(timeout, starttime)
+                if not self.wait_elb_healthy(instance_id, timeout=waittime):
                     ret = False
 
         return ret
 
-    def terminate(self, instance_id, wait=True):
+    def terminate(self, instance_id, decrement_capacity=False, wait=True,
+            timeout=None):
         ret = True
         group = self.find_group_by_instance(instance_id)
         if not group:
@@ -514,7 +611,10 @@ class billowRotate(object):
             return False
 
         try:
-            if not group.terminate(instance_id, decrement_capacity=False):
+            if not group.terminate(
+                    instance_id,
+                    decrement_capacity=decrement_capacity
+                    ):
                 self.log('failed terminating instance %s from group %s' \
                         % (instance_id, group.name))
                 return False
@@ -532,40 +632,74 @@ class billowRotate(object):
                 raise e
 
         if wait:
-            if not self.wait_group_terminated(instance_id):
+            if not self.wait_group_terminated(instance_id, timeout=timeout):
                 ret = False
 
         return ret
 
-    def rotate_instance(self, instance_id, wait=True):
+    def rotate_instance(self, instance_id, wait=True, timeout=None):
+        """
+        Rotate a single instance in a Group
+        """
+        terminate_after = True
+        if timeout:
+            starttime = time.time()
+
         group = self.find_group_by_instance(instance_id)
         if not group:
             self.log('no group found, cannot rotate instance %s' \
                     % instance_id)
             return False
 
-        # Preserve original instance list for waiting on later
-        orig_instlist = group.instances
+        # Capture current group list to detect new instance
+        instlist = group.instances
 
-        # Do not wait for termination, instead wait for launched instance
-        if not self.terminate(instance_id, wait=False):
-            return False
+        # Terminate before launch
+        if group.cur_size == group.max_size:
+            terminate_after = False
 
-        if wait:
-            # Wait for new instance to enter Group
-            ret = self.wait_group_launched(group, orig_instlist)
-            if not ret:
+            # Do not wait for termination, instead wait for launched instance
+            if not self.terminate(instance_id, wait=False):
                 return False
 
-            # Wait for all instances to register with Balancer
-            for i in ret:
-                if not self.wait_elb_registered(i):
-                    return False
+        # Increase Group size
+        else:
+            if not group.increment():
+                self.log('group launch instance failed')
+                return False
 
-            # Wait for all instances to pass health checks
-            for i in ret:
-                if not self.wait_elb_healthy(i):
+        waittime = timeout
+        if timeout:
+            waittime = self.wait_timeout(timeout, starttime)
+        if not self.wait_launch(group, instlist, timeout=waittime):
+            return False
+
+        if terminate_after:
+            if timeout:
+                waittime = self.wait_timeout(timeout, starttime)
+            # Terminate and wait
+            if not self.terminate(instance_id, decrement_capacity=True,
+                    wait=True, timeout=waittime):
+                return False
+
+        return True
+
+    def rotate(self, wait=True, timeout=None):
+        if timeout:
+            starttime = time.time()
+
+        rotatelist = self.order()
+        for instance in rotatelist:
+            waittime = timeout
+            if timeout:
+                waittime = self.wait_timeout(timeout, starttime)
+                # Abort rotation if no time left on the clock
+                if waittime <= 0:
                     return False
+            ret = self.rotate_instance(instance, timeout=timeout)
+            if not ret:
+                self.log('failed rotating %s' % instance)
+                continue
 
         return True
 

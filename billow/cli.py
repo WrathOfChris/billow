@@ -384,6 +384,18 @@ def billow_rotate():
         help='yaml output',
         action='store_true'
     )
+    parsergroup = parser.add_mutually_exclusive_group()
+    parsergroup.add_argument(
+        '--nowait',
+        help='do not wait for termination',
+        action='store_true'
+    )
+    parsergroup.add_argument(
+        '--timeout',
+        type=int,
+        help='action timeout in seconds',
+        default=None
+    )
     parser.add_argument(
         'service',
         type=str,
@@ -391,6 +403,9 @@ def billow_rotate():
     )
     args = parser.parse_args()
     common_args(args)
+    wait = True
+    if args.nowait:
+        wait = False
 
     output = list()
     bc = billow.billowCloud(regions=args.regions)
@@ -403,10 +418,7 @@ def billow_rotate():
         warnings = r.safety()
         for w in warnings:
             sys.stderr.write('WARNING: %s\n' % w)
-
-        ret = r.rotate(timeout=60)
-        if not ret:
-            output.append("FAILED")
+        r.rotate(wait=wait, timeout=args.timeout)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -435,10 +447,17 @@ def billow_rotate_deregister():
         help='yaml output',
         action='store_true'
     )
+    parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '--nowait',
-        help='do not wait for deregistration',
+        help='do not wait for termination',
         action='store_true'
+    )
+    parsergroup.add_argument(
+        '--timeout',
+        type=int,
+        help='action timeout in seconds',
+        default=None
     )
     parser.add_argument(
         '--service',
@@ -464,8 +483,7 @@ def billow_rotate_deregister():
         sys.exit(errno.ENOENT)
     for s in services:
         r = billow.billowRotate(s)
-
-        r.deregister(args.instance, wait=wait)
+        r.deregister(args.instance, wait=wait, timeout=args.timeout)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -494,10 +512,17 @@ def billow_rotate_register():
         help='yaml output',
         action='store_true'
     )
+    parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '--nowait',
-        help='do not wait for deregistration',
+        help='do not wait for termination',
         action='store_true'
+    )
+    parsergroup.add_argument(
+        '--timeout',
+        type=int,
+        help='action timeout in seconds',
+        default=None
     )
     parser.add_argument(
         '--service',
@@ -523,8 +548,8 @@ def billow_rotate_register():
         sys.exit(errno.ENOENT)
     for s in services:
         r = billow.billowRotate(s)
-
-        r.register(args.instance, wait=wait, healthy=True)
+        r.register(args.instance, wait=wait, timeout=args.timeout,
+                healthy=True)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -553,10 +578,17 @@ def billow_rotate_terminate():
         help='yaml output',
         action='store_true'
     )
+    parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '--nowait',
         help='do not wait for termination',
         action='store_true'
+    )
+    parsergroup.add_argument(
+        '--timeout',
+        type=int,
+        help='action timeout in seconds',
+        default=None
     )
     parser.add_argument(
         '--service',
@@ -582,8 +614,7 @@ def billow_rotate_terminate():
         sys.exit(errno.ENOENT)
     for s in services:
         r = billow.billowRotate(s)
-
-        r.terminate(args.instance, wait=wait)
+        r.terminate(args.instance, wait=wait, timeout=args.timeout)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
@@ -612,10 +643,17 @@ def billow_rotate_instance():
         help='yaml output',
         action='store_true'
     )
+    parsergroup = parser.add_mutually_exclusive_group()
     parsergroup.add_argument(
         '--nowait',
         help='do not wait for termination',
         action='store_true'
+    )
+    parsergroup.add_argument(
+        '--timeout',
+        type=int,
+        help='action timeout in seconds',
+        default=None
     )
     parser.add_argument(
         '--service',
@@ -641,7 +679,7 @@ def billow_rotate_instance():
         sys.exit(errno.ENOENT)
     for s in services:
         r = billow.billowRotate(s)
-        r.rotate_instance(args.instance, wait=wait)
+        r.rotate_instance(args.instance, wait=wait, timeout=args.timeout)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
