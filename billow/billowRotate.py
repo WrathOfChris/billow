@@ -304,11 +304,11 @@ class billowRotate(object):
         return True
 
     def wait_elb_healthy(self, instance_id, sleep=5, timeout=None):
+        starttime = time.time()
         if timeout:
             if timeout < 0:
                 self.log('timed out waiting for balancer health check')
                 return False
-            starttime = time.time()
 
         healthchecks = dict()
         healthtimes = dict()
@@ -530,7 +530,8 @@ class billowRotate(object):
             if not self.wait_elb_healthy(i, timeout=timeout):
                 return False
 
-        return True
+        # list of instance_id
+        return ret
 
     def launch(self, group, wait=True, timeout=None):
         """
@@ -654,9 +655,19 @@ class billowRotate(object):
         # Capture current group list to detect new instance
         instlist = group.instances
 
+        elasticips = self.get_elasticips(instance_id)
+        for e in elasticips:
+            self.log('disassociating static IP %s association %s ' \
+                    'allocation %s interface %s' \
+                    % (e['public_ip_address'], e['association_id'],
+                        e['allocation_id'], e['network_interface_id']))
+            group.asg.disassociate_address(e['association_id'])
+
         # Terminate before launch
         if group.cur_size == group.max_size:
             terminate_after = False
+
+            self.log('terminating instance %s' % instance_id)
 
             # Do not wait for termination, instead wait for launched instance
             if not self.terminate(instance_id, wait=False):
@@ -664,19 +675,44 @@ class billowRotate(object):
 
         # Increase Group size
         else:
+            self.log('launching instance')
+
             if not group.increment():
                 self.log('group launch instance failed')
                 return False
 
+        # Wait for new instance to enter Group
+        ret = self.wait_group_launched(group, instlist, timeout=timeout)
+        if not ret:
+            return False
+        if len(ret) > 1:
+            self.log('expected 1 instance launch, found %d' % len(ret))
+
+        # Put back Elastic / Private IPs
+        newinstance = ret[0]
+        for e in elasticips:
+            self.log('associating static IP %s allocation %s' \
+                    % (e['public_ip_address'], e['allocation_id']))
+            ret = self.put_elasticip(newinstance, e['allocation_id'])
+            if not ret:
+                self.log('failed associating static IP %s allocation %s' \
+                        % (e['public_ip_address'], e['allocation_id']))
+                return False
+
+        # Full launch wait after addresses associated
         waittime = timeout
         if timeout:
             waittime = self.wait_timeout(timeout, starttime)
-        if not self.wait_launch(group, instlist, timeout=waittime):
+        ret = self.wait_launch(group, instlist, timeout=waittime)
+        if ret == False:
             return False
 
         if terminate_after:
             if timeout:
                 waittime = self.wait_timeout(timeout, starttime)
+
+            self.log('terminating instance %s' % instance_id)
+
             # Terminate and wait
             if not self.terminate(instance_id, decrement_capacity=True,
                     wait=True, timeout=waittime):
@@ -687,6 +723,8 @@ class billowRotate(object):
     def rotate(self, wait=True, timeout=None):
         if timeout:
             starttime = time.time()
+
+        errors = 0
 
         rotatelist = self.order()
         for instance in rotatelist:
@@ -699,17 +737,74 @@ class billowRotate(object):
             ret = self.rotate_instance(instance, timeout=timeout)
             if not ret:
                 self.log('failed rotating %s' % instance)
+                errors += 1
                 continue
 
+        if errors > 0:
+            self.log('finished: %d FAILURES' % errors)
+            return False
+
+        self.log('finished: success')
         return True
+
+    def get_elasticips(self, instance_id):
+        elasticips = list()
+
+        group = self.find_group_by_instance(instance_id)
+        if not group:
+            return list()
+
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            return list()
+
+        addrlist = list()
+        for n in instance.interfaces:
+            # ElasticIPs are owned by account number, standard by 'amazon'
+            if n['owner'] != 'amazon':
+                addrlist.append(n['public_ip_address'])
+
+        if not addrlist:
+            return list()
+
+        addrs = group.asg.get_addresses(addrlist)
+        for a in addrs:
+            addr = {
+                    'public_ip_address': a.public_ip,
+                    'private_ip_address': a.private_ip_address,
+                    'instance_id': a.instance_id,
+                    'allocation_id': a.allocation_id,
+                    'association_id': a.association_id,
+                    'network_interface_id': a.network_interface_id
+                    }
+            elasticips.append(addr)
+
+        return elasticips
+
+    def put_elasticip(self, instance_id, allocation_id):
+        group = self.find_group_by_instance(instance_id)
+        if not group:
+            return False
+
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            return False
+
+        if not instance.interfaces:
+            return False
+
+        ret = group.asg.associate_address(
+                allocation_id,
+                instance_id=instance_id,
+                network_interface_id=instance.interfaces[0]['id'])
+
+        return ret
 
 # TODO:
 # - Rotation:
 #   - Instance Persistence:
-#     - ElasticIP disassociate
 #     - ? ENI disassociate
 #     - Secondary Private IP unassign
 #     - ? EBS unmount
 #   - Instance Persistence:
-#     - ElasticIP associate
 #     - Secondary IP associate
