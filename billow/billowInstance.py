@@ -46,6 +46,7 @@ class billowInstance(object):
         self.private_ip_address = None
         self.subnet_id = None
         self.vpc_id = None
+        self.interfaces = None
 
         # AWS Specific
         self.aws_ebs_optimized = None
@@ -134,6 +135,28 @@ class billowInstance(object):
         self.groups = list()
         for g in instance.groups:
             self.groups.append(g.id)
+
+        self.interfaces = list()
+        for n in instance.interfaces:
+            interface = {
+                    'id': n.id,
+                    'private_ip_address': n.private_ip_address,
+                    'source_dest_check': n.source_dest_check,
+                    'subnet_id': n.subnet_id,
+                    'vpc_id': n.vpc_id
+                    }
+            # Many properties are missing during Pending state
+            if hasattr(n, 'ipOwnerId'):
+                interface['owner'] = n.ipOwnerId,
+            if hasattr(n, 'privateDnsName'):
+                interface['private_dns_name'] = n.privateDnsName
+            if hasattr(n, 'publicDnsName'):
+                interface['public_dns_name'] = n.publicDnsName
+            if hasattr(n, 'publicIp'):
+                interface['public_ip_address'] = n.publicIp
+            if n.attachment:
+                interface['attachment_id'] = n.attachment.id
+            self.interfaces.append(interface)
 
     def push_balancer_info(self, instance):
         """
