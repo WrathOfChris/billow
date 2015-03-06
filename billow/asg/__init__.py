@@ -418,3 +418,19 @@ class asg(object):
                 break
 
         return self.activities
+
+    def get_addresses(self, ip_addresses):
+        """
+        get Addresses
+        """
+        self.__connect_ec2()
+
+        if not isinstance(ip_addresses, list):
+            ip_addresses = [ip_addresses]
+
+        addrs = self.aws.wrap(
+            self.ec2.get_all_addresses,
+            addresses=ip_addresses
+        )
+
+        return addrs
