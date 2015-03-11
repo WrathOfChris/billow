@@ -909,12 +909,3 @@ class billowRotate(object):
 
         for p in self.private_secondary_failures:
             self.log('failure repairing assignment of private IP %s' % p)
-
-# TODO:
-# - Rotation:
-#   - Instance Persistence:
-#     - ? ENI disassociate
-#     - Secondary Private IP unassign
-#     - ? EBS unmount
-#   - Instance Persistence:
-#     - Secondary IP associate
