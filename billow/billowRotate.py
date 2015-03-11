@@ -908,4 +908,4 @@ class billowRotate(object):
                                 break
 
         for p in self.private_secondary_failures:
-            self.log('failure repairing assignment of private IP %s' % p)
+            self.log('failed repairing assignment of private IP %s' % p)
