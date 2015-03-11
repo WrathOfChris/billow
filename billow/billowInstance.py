@@ -147,13 +147,19 @@ class billowInstance(object):
                     }
             # Many properties are missing during Pending state
             if hasattr(n, 'ipOwnerId'):
-                interface['owner'] = n.ipOwnerId,
+                interface['owner'] = n.ipOwnerId
             if hasattr(n, 'privateDnsName'):
                 interface['private_dns_name'] = n.privateDnsName
             if hasattr(n, 'publicDnsName'):
                 interface['public_dns_name'] = n.publicDnsName
             if hasattr(n, 'publicIp'):
                 interface['public_ip_address'] = n.publicIp
+            if hasattr(n, 'private_ip_addresses'):
+                interface['private_ip_addresses'] = list()
+                for a in n.private_ip_addresses:
+                    if not a.primary:
+                        interface['private_ip_addresses'].append(
+                                a.private_ip_address)
             if n.attachment:
                 interface['attachment_id'] = n.attachment.id
             self.interfaces.append(interface)
