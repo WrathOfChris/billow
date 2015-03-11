@@ -19,6 +19,7 @@ class billowRotate(object):
         self.instances = list()
         self.priority = list()
         self.__logger = self.consolelogger
+        self.private_secondary_failures = list()
 
     def consolelogger(self, msg):
         sys.stderr.write("billowRotate %s: %s\n" % (self.service.service, msg))
@@ -36,10 +37,11 @@ class billowRotate(object):
         2. Check for redundancy reduction in each zone
         3. Check for (cur == max <= 1)
         4. Check CrossZoneLB disabled and empty AZ
+        5. Check instances for secondary Private IPs and multi-subnet
         """
         warnings = list()
         for g in self.service.groups:
-            instances = g.instancestatus
+            instances = g.instances
 
             # 1. Check for no instances
             if len(instances) == 0:
@@ -70,6 +72,18 @@ class billowRotate(object):
                             warnings.append("%s deadend traffic, zoned ' \
                                     'balancer without cross-zone in %s" % \
                                     (g.group, z))
+
+            # 5. Check instances for secondary Private IPs and multi-subnet
+            for i in instances:
+                for ni in i.interfaces:
+                    if (len(g.subnets) > 1 and \
+                            'private_ip_addresses' in ni and \
+                            len(ni['private_ip_addresses']) > 0):
+                        warnings.append('%s instance %s has secondary ' \
+                                'private IP address %s but group has ' \
+                                'multiple subnets' \
+                                % (g.group, i.id,
+                                    ni['private_ip_addresses'][0]))
 
         return warnings
 
@@ -663,6 +677,15 @@ class billowRotate(object):
                         e['allocation_id'], e['network_interface_id']))
             group.asg.disassociate_address(e['association_id'])
 
+        privateips = self.get_secondaryips(instance_id)
+        for p in privateips:
+            self.log('unassigning private IP %s interface %s' \
+                    % (p['private_ip_address'], p['network_interface_id']))
+            group.asg.unassign_private_ip_addresses(
+                    network_interface_id=p['network_interface_id'],
+                    private_ip_addresses=p['private_ip_address']
+                    )
+
         # Terminate before launch
         if group.cur_size == group.max_size:
             terminate_after = False
@@ -698,6 +721,14 @@ class billowRotate(object):
                 self.log('failed associating static IP %s allocation %s' \
                         % (e['public_ip_address'], e['allocation_id']))
                 return False
+
+        for p in privateips:
+            self.log('assigning private IP %s' % p['private_ip_address'])
+            ret = self.put_secondaryip(newinstance, p['private_ip_address'])
+            if not ret:
+                self.log('failed assigning private IP %s' \
+                        % p['private_ip_address'])
+                self.private_secondary_failures.append(p['private_ip_address'])
 
         # Full launch wait after addresses associated
         waittime = timeout
@@ -739,6 +770,11 @@ class billowRotate(object):
                 self.log('failed rotating %s' % instance)
                 errors += 1
                 continue
+
+        # Post-rotation attempt to associate orphaned private IPs
+        if self.private_secondary_failures:
+            self.finalize_secondaryip()
+            errors += len(self.private_secondary_failures)
 
         if errors > 0:
             self.log('finished: %d FAILURES' % errors)
@@ -799,6 +835,80 @@ class billowRotate(object):
                 network_interface_id=instance.interfaces[0]['id'])
 
         return ret
+
+    def get_secondaryips(self, instance_id):
+        group = self.find_group_by_instance(instance_id)
+        if not group:
+            return list()
+
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            return list()
+
+        addrlist = list()
+        for n in instance.interfaces:
+            if 'private_ip_addresses' in n:
+                for a in n['private_ip_addresses']:
+                    if a != n['private_ip_address']:
+                        addr = {
+                                'private_ip_address': a,
+                                'instance_id': instance.id,
+                                'network_interface_id': n['id']
+                                }
+                        addrlist.append(addr)
+
+        return addrlist
+
+    def put_secondaryip(self, instance_id, private_ip_address):
+        if not private_ip_address:
+            return False
+        if not isinstance(private_ip_address, list):
+            private_ip_address = [private_ip_address]
+
+        group = self.find_group_by_instance(instance_id)
+        if not group:
+            return False
+
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            return False
+
+        if not instance.interfaces:
+            return False
+
+        try:
+            ret = group.asg.assign_private_ip_addresses(
+                    network_interface_id=instance.interfaces[0]['id'],
+                    private_ip_addresses=private_ip_address
+                    )
+        except BotoServerError as e:
+            if e.error_code == 'InvalidParameterValue':
+                self.log('failed assigning secondary private IP %s to ' \
+                        'instance %s interface %s' \
+                        % (private_ip_address[0], instance_id,
+                            instance.interfaces[0]['id']))
+                return False
+            else:
+                raise e
+
+        return ret
+
+    def finalize_secondaryip(self):
+        for g in self.service.groups:
+            for i in g.instances:
+                if not self.private_secondary_failures:
+                    return
+                for ni in i.interfaces:
+                    if 'private_ip_addresses' not in ni:
+                        for p in self.private_secondary_failures:
+                            ret = self.put_secondaryip(i.id, p)
+                            if ret:
+                                self.log('repair assigning private IP %s' % p)
+                                self.private_secondary_failures.remove(p)
+                                break
+
+        for p in self.private_secondary_failures:
+            self.log('failure repairing assignment of private IP %s' % p)
 
 # TODO:
 # - Rotation:
