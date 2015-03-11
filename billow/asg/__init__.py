@@ -375,8 +375,8 @@ class asg(object):
 
         ret = self.aws.wrap(
             self.ec2.unassign_private_ip_addresses,
-            network_interface_id=None,
-            private_ip_addresses=None
+            network_interface_id=network_interface_id,
+            private_ip_addresses=private_ip_addresses
             )
 
         return ret
@@ -389,8 +389,8 @@ class asg(object):
 
         ret = self.aws.wrap(
             self.ec2.assign_private_ip_addresses,
-            network_interface_id=None,
-            private_ip_addresses=None,
+            network_interface_id=network_interface_id,
+            private_ip_addresses=private_ip_addresses,
             allow_reassignment=False
             )
 
