@@ -726,8 +726,6 @@ class billowRotate(object):
             self.log('assigning private IP %s' % p['private_ip_address'])
             ret = self.put_secondaryip(newinstance, p['private_ip_address'])
             if not ret:
-                self.log('failed assigning private IP %s' \
-                        % p['private_ip_address'])
                 self.private_secondary_failures.append(p['private_ip_address'])
 
         # Full launch wait after addresses associated
@@ -899,11 +897,13 @@ class billowRotate(object):
                 if not self.private_secondary_failures:
                     return
                 for ni in i.interfaces:
-                    if 'private_ip_addresses' not in ni:
+                    if ('private_ip_addresses' not in ni or \
+                            len(ni['private_ip_addresses']) == 0):
                         for p in self.private_secondary_failures:
                             ret = self.put_secondaryip(i.id, p)
                             if ret:
-                                self.log('repair assigning private IP %s' % p)
+                                self.log('repair assigned private IP %s ' \
+                                        'to instance %s' % (p, i.id))
                                 self.private_secondary_failures.remove(p)
                                 break
 
