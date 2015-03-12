@@ -184,11 +184,13 @@ class billowInstance(object):
         if not isinstance(status, boto.ec2.instancestatus.InstanceStatus):
             raise TypeError
         self.hardware_status = status.system_status.status
-        self.hardware_reachability = \
-                status.system_status.details['reachability']
+        if 'reachability' in status.system_status.details:
+            self.hardware_reachability = \
+                    status.system_status.details['reachability']
         self.instance_status = status.instance_status.status
-        self.instance_reachability = \
-                status.instance_status.details['reachability']
+        if 'reachability' in status.instance_status.details:
+            self.instance_reachability = \
+                    status.instance_status.details['reachability']
         self.status_events = list()
         if status.events:
             for e in status.events:
