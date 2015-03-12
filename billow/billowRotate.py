@@ -795,7 +795,7 @@ class billowRotate(object):
         addrlist = list()
         for n in instance.interfaces:
             # ElasticIPs are owned by account number, standard by 'amazon'
-            if n['owner'] != 'amazon':
+            if 'owner' in n and n['owner'] != 'amazon':
                 addrlist.append(n['public_ip_address'])
 
         if not addrlist:
