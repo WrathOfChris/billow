@@ -178,11 +178,17 @@ class asg(object):
             # Use get_all_reservations() since get_only_instances does not
             # support next_token for rate-limiting
             #
-            reservations = self.aws.wrap(
-                self.ec2.get_all_reservations,
-                instance_ids=instance_ids,
-                next_token=marker
-            )
+            try:
+                reservations = self.aws.wrap(
+                    self.ec2.get_all_reservations,
+                    instance_ids=instance_ids,
+                    next_token=marker
+                )
+            except BotoServerError as e:
+                if e.error_code == 'InvalidInstanceID.NotFound':
+                    return list()
+                else:
+                    raise e
             for r in reservations:
                 for i in r.instances:
                     instances.append(i)
