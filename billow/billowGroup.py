@@ -5,6 +5,7 @@ from . import sec
 import boto
 import datetime
 import billow
+import json
 
 
 class billowGroup(object):
@@ -26,6 +27,7 @@ class billowGroup(object):
         self.__cluster = None
         self.parent = parent
         self.update_time = None
+        self.settings = dict()
 
         # Backends
         if self.parent:
@@ -44,6 +46,8 @@ class billowGroup(object):
         self.tagservice = 'service'
         self.tagenviron = 'env'
         self.tagcluster = 'cluster'
+        self.tagsettings = 'billow'
+        self.versettings = 1
 
     def config(self):
         self.__config = dict()
@@ -147,6 +151,41 @@ class billowGroup(object):
                 self.__environ = t.value
             elif t.key == self.tagcluster:
                 self.__cluster = t.value
+            elif t.key == self.tagsettings:
+                self.__load_settings(t.value)
+
+    def __load_settings(self, raw):
+        """
+            {
+                "version": 1,
+                "rotate": false,
+                "urlterminate": "80:/terminate",
+                "urlstatus": "80:/status"
+            }
+        """
+        if not raw:
+            return
+        self.settings = dict()
+        try:
+            settings = json.loads(raw)
+        except:
+            # Invalid JSON, ignore
+            return
+
+        version = 0
+        if 'version' in settings:
+            version = settings['version']
+
+        # All Versions
+        if version >= 0:
+            if 'rotate' in settings:
+                self.settings['rotate'] = bool(settings['rotate'])
+
+        if version >= 1:
+            if 'urlterminate' in settings:
+                self.settings['urlterminate'] = settings['urlterminate']
+            if 'urlstatus' in settings:
+                self.settings['urlstatus'] = settings['urlstatus']
 
     def __load_config(self):
         if not self.rawconfig:
