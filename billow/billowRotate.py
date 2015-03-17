@@ -2,9 +2,12 @@ from . import asg
 import billow
 import boto
 from boto.exception import BotoServerError
+from contextlib import closing
 import itertools
+import json
 import sys
 import time
+import urllib2
 
 class billowRotate(object):
     """
@@ -20,6 +23,7 @@ class billowRotate(object):
         self.priority = list()
         self.__logger = self.consolelogger
         self.private_secondary_failures = list()
+        self.urltimeout = 60
 
     def consolelogger(self, msg):
         sys.stderr.write("billowRotate %s: %s\n" % (self.service.service, msg))
@@ -652,6 +656,130 @@ class billowRotate(object):
 
         return ret
 
+    def notify_terminate(self, group, instance_id, timeout=None):
+        if 'urlterminate' not in group.settings:
+            return True
+        split = group.settings['urlterminate'].split(':')
+        if len(split) != 2:
+            self.log("instance %s terminate url invalid config")
+            return False
+        port = int(split[0])
+        path = split[1]
+
+        if port == 0 or path[0] != '/':
+            self.log("instance %s terminate url invalid config")
+            return False
+
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            return False
+
+        # Always require a timeout
+        if not timeout:
+            timeout = self.urltimeout
+
+        url = 'http://%s:%d%s' % (instance.private_ip_address, port, path)
+        data = '{}'
+        header = {'Content-Type': 'application/json;charset=UTF-8'}
+        req = urllib2.Request(url, data, header)
+
+        self.log("instance %s terminate url %s" % (instance_id, url))
+        try:
+            with closing(urllib2.urlopen(req, timeout=timeout)) as f:
+                response = json.loads(f.read())
+        except ValueError:
+            # Invalid JSON
+            response = dict()
+        except urllib2.URLError, e:
+            self.log("instance %s terminate url failure %s" % \
+                    (instance_id, e.reason))
+            if str(e.reason) == "timed out":
+                return False
+            raise
+        except urllib2.HTTPError, e:
+            self.log("instance %s terminate url failure code %d" % \
+                    (instance_id, e.code))
+            raise
+
+        return True
+
+    def wait_notify(self, group, instance_id, sleep=5, timeout=None):
+        if 'urlstatus' not in group.settings:
+            return True
+        split = group.settings['urlstatus'].split(':')
+        if len(split) != 2:
+            self.log("instance %s status url invalid config")
+            return False
+        port = int(split[0])
+        path = split[1]
+
+        if port == 0 or path[0] != '/':
+            self.log("instance %s status url invalid config")
+            return False
+
+        # Always require a timeout
+        urltimeout = timeout
+        if not timeout:
+            urltimeout = self.urltimeout
+
+        starttime = 0
+        if timeout:
+            starttime = time.time()
+
+        healthy = False
+        while not healthy:
+            instance = self.find_group_instance(group, instance_id)
+            if not instance:
+                self.log('no instance found, cannot wait for instance %s ' \
+                        'url status' % instance_id)
+                return False
+
+            url = 'http://%s:%d%s' % (instance.private_ip_address, port, path)
+            data = '{}'
+            header = {'Content-Type': 'application/json;charset=UTF-8'}
+            req = urllib2.Request(url, data, header)
+
+            healthy = True
+            try:
+                with closing(urllib2.urlopen(req, timeout=urltimeout)) as f:
+                    raw = f.read()
+                    response = json.loads(raw)
+            except ValueError, e:
+                # Invalid JSON
+                response = dict()
+                if isinstance(raw, str):
+                    response['status'] = raw
+            except urllib2.URLError, e:
+                self.log("instance %s status url failure %s" % \
+                        (instance_id, e.reason))
+                if str(e.reason) != "timed out":
+                    raise
+                healthy = False
+            except urllib2.HTTPError, e:
+                self.log("instance %s status url failure code %d" % \
+                        (instance_id, e.code))
+                raise
+
+            if 'status' in response:
+                if response['status'] != 'OK':
+                    healthy = False
+
+            if not healthy and timeout and (time.time() - starttime) > timeout:
+                self.log('timed out waiting for instance %s status url' \
+                        % instance_id)
+                return False
+
+            if not healthy:
+                timeoutstr = ''
+                if timeout:
+                    timeoutstr = ' timeout %ds' \
+                            % int(timeout - (time.time() - starttime))
+                self.log('sleeping %ds waiting for instance %s status url ' \
+                        '%s%s' % (sleep, instance_id, url, timeoutstr))
+                time.sleep(sleep)
+
+        return True
+
     def rotate_instance(self, instance_id, wait=True, timeout=None):
         """
         Rotate a single instance in a Group
@@ -666,8 +794,21 @@ class billowRotate(object):
                     % instance_id)
             return False
 
+        if 'rotate' in group.settings and group.settings['rotate'] == False:
+            self.log('skipping rotation of instance %s due to tag ' \
+                    'rotate=false' % instance_id)
+            return True
+
         # Capture current group list to detect new instance
         instlist = group.instances
+
+        #
+        # URL NOTIFY - HTTP request to instance endpoint for termination
+        #
+        if not self.notify_terminate(group, instance_id, timeout=timeout):
+            return False
+        if not self.wait_notify(group, instance_id, timeout=timeout):
+            return False
 
         elasticips = self.get_elasticips(instance_id)
         for e in elasticips:
