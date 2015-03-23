@@ -373,6 +373,11 @@ class billowGroup(object):
         for i in self.rawgroup.instances:
             inst = billow.billowInstance(i.instance_id, region=self.region)
             inst.push_group_info(i)
+            if self.rawstatus:
+                for s in self.rawstatus:
+                    if s.id == i.instance_id:
+                        inst.push_status_info(s)
+                        break
             instances.append(inst)
             ids.append(inst.id)
 
