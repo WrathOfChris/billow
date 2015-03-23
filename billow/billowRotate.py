@@ -703,7 +703,11 @@ class billowRotate(object):
 
         return True
 
-    def wait_notify(self, group, instance_id, sleep=5, timeout=None):
+    def wait_notify(self, group, instance_id, sleep=5, timeout=None,
+            hardfail_is_success=False):
+        """
+        Wait for GET to 'urlstatus' to return "OK" or '{"status": "OK"}'
+        """
         if 'urlstatus' not in group.settings:
             return True
         split = group.settings['urlstatus'].split(':')
@@ -752,13 +756,18 @@ class billowRotate(object):
             except urllib2.URLError, e:
                 self.log("instance %s status url failure %s" % \
                         (instance_id, e.reason))
-                if str(e.reason) != "timed out":
-                    raise
                 healthy = False
+                if str(e.reason) != "timed out":
+                    if not hardfail_is_success:
+                        raise
+                    else:
+                        # hardfail is sometimes success
+                        healthy = True
             except urllib2.HTTPError, e:
                 self.log("instance %s status url failure code %d" % \
                         (instance_id, e.code))
-                raise
+                if not hardfail_is_success:
+                    raise
 
             if 'status' in response:
                 if response['status'] != 'OK':
