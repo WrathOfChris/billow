@@ -160,7 +160,8 @@ class billowGroup(object):
                 "version": 1,
                 "rotate": false,
                 "urlterminate": "80:/terminate",
-                "urlstatus": "80:/status"
+                "urlstatus": "80:/status",
+                "urlsuccess": "valid"
             }
         """
         if not raw:
@@ -186,6 +187,8 @@ class billowGroup(object):
                 self.settings['urlterminate'] = settings['urlterminate']
             if 'urlstatus' in settings:
                 self.settings['urlstatus'] = settings['urlstatus']
+            if 'urlsuccess' in settings:
+                self.settings['urlsuccess'] = settings['urlsuccess']
 
     def __load_config(self):
         if not self.rawconfig:
