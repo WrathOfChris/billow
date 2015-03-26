@@ -28,6 +28,7 @@ setup(
             "billow-list-images = billow.cli:billow_list_images",
             "billow-list-rotate = billow.cli:billow_list_rotate",
             "billow-rotate = billow.cli:billow_rotate",
+            "billow-rotate-info = billow.cli:billow_rotate_info",
             "billow-rotate-deregister = billow.cli:billow_rotate_deregister",
             "billow-rotate-instance = billow.cli:billow_rotate_instance",
             "billow-rotate-register = billow.cli:billow_rotate_register",

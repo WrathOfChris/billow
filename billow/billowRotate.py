@@ -684,27 +684,29 @@ class billowRotate(object):
         req = urllib2.Request(url, data, header)
 
         self.log("instance %s terminate url %s" % (instance_id, url))
+        retcode = True
         try:
             with closing(urllib2.urlopen(req, timeout=timeout)) as f:
-                response = json.loads(f.read())
-        except ValueError:
-            # Invalid JSON
-            response = dict()
+                raw = f.read()
+        except urllib2.HTTPError, e:
+            self.log("instance %s terminate url failure code %d reason %s" % \
+                    (instance_id, e.code, e.reason))
+            raw = e.read()
+            retcode = False
         except urllib2.URLError, e:
             self.log("instance %s terminate url failure %s" % \
                     (instance_id, e.reason))
-            if str(e.reason) == "timed out":
+            if "timed out" in str(e.reason) \
+                    or "Connection refused" in str(e.reason):
                 return False
             raise
-        except urllib2.HTTPError, e:
-            self.log("instance %s terminate url failure code %d" % \
-                    (instance_id, e.code))
-            raise
 
-        return True
+        if raw and len(raw) > 0:
+            self.log("instance %s terminate url response %s" % \
+                    (instance_id, raw))
+        return retcode
 
-    def wait_notify(self, group, instance_id, sleep=5, timeout=None,
-            hardfail_is_success=False):
+    def wait_notify(self, group, instance_id, sleep=5, timeout=None):
         """
         Wait for GET to 'urlstatus' to return "OK" or '{"status": "OK"}'
         """
@@ -716,6 +718,10 @@ class billowRotate(object):
             return False
         port = int(split[0])
         path = split[1]
+
+        successcode = 'OK'
+        if 'urlsuccess' in group.settings:
+            successcode = group.settings['urlsuccess']
 
         if port == 0 or path[0] != '/':
             self.log("instance %s status url invalid config")
@@ -739,38 +745,43 @@ class billowRotate(object):
                 return False
 
             url = 'http://%s:%d%s' % (instance.private_ip_address, port, path)
-            data = '{}'
+            data = None
             header = {'Content-Type': 'application/json;charset=UTF-8'}
             req = urllib2.Request(url, data, header)
 
             healthy = True
+            raw = ''
             try:
                 with closing(urllib2.urlopen(req, timeout=urltimeout)) as f:
                     raw = f.read()
-                    response = json.loads(raw)
-            except ValueError, e:
+            except urllib2.HTTPError, e:
+                # HTTP reply 3xx-5xx, not ready
+                self.log("instance %s status url failure (code %d)" % \
+                        (instance_id, e.code))
+                raw = e.read()
+                healthy = False
+            except urllib2.URLError, e:
+                # Connection error, must assume service is gone
+                self.log("instance %s status url gone, continuing (%s)" % \
+                        (instance_id, e.reason))
+                healthy = True
+                # XXX wait on timed out?
+                if str(e.reason) == "timed out":
+                    healthy = False
+
+            # Parse response, just raw response if not JSON
+            try:
+                response = json.loads(raw)
+            except ValueError:
                 # Invalid JSON
                 response = dict()
                 if isinstance(raw, str):
                     response['status'] = raw
-            except urllib2.URLError, e:
-                self.log("instance %s status url failure %s" % \
-                        (instance_id, e.reason))
-                healthy = False
-                if str(e.reason) != "timed out":
-                    if not hardfail_is_success:
-                        raise
-                    else:
-                        # hardfail is sometimes success
-                        healthy = True
-            except urllib2.HTTPError, e:
-                self.log("instance %s status url failure code %d" % \
-                        (instance_id, e.code))
-                if not hardfail_is_success:
-                    raise
 
+            # Compare against expected status value
             if 'status' in response:
-                if response['status'] != 'OK':
+                if (len(response['status']) > 0 and \
+                        response['status'] != successcode):
                     healthy = False
 
             if not healthy and timeout and (time.time() - starttime) > timeout:
@@ -783,8 +794,12 @@ class billowRotate(object):
                 if timeout:
                     timeoutstr = ' timeout %ds' \
                             % int(timeout - (time.time() - starttime))
+                responsestr = ''
+                if response and 'status' in response:
+                    responsestr = ' response %s' % response['status']
                 self.log('sleeping %ds waiting for instance %s status url ' \
-                        '%s%s' % (sleep, instance_id, url, timeoutstr))
+                        '%s%s%s' % (sleep, instance_id, url, timeoutstr,
+                            responsestr))
                 time.sleep(sleep)
 
         return True

@@ -431,6 +431,68 @@ def billow_rotate():
     sys.exit(0)
 
 
+def billow_rotate_info():
+    catch_sigint()
+    parser = common_parser('billow rotate')
+    parsergroup = parser.add_mutually_exclusive_group()
+    parsergroup.add_argument(
+        '-j',
+        '--json',
+        help='json output',
+        action='store_true'
+    )
+    parsergroup.add_argument(
+        '-y',
+        '--yaml',
+        help='yaml output',
+        action='store_true'
+    )
+    parser.add_argument(
+        'service',
+        type=str,
+        help='service to rotate'
+    )
+    args = parser.parse_args()
+    common_args(args)
+
+    output = list()
+    bc = billow.billowCloud(regions=args.regions)
+    services = bc.get_service(args.service)
+    if not services:
+        sys.stderr.write('no service found\n')
+        sys.exit(errno.ENOENT)
+    for s in services:
+        r = billow.billowRotate(s)
+        settings = list()
+        for g in s.groups:
+            g.refresh()
+            if g.settings:
+                settings.append(g.settings)
+        order = r.order()
+        addrs = list()
+        for o in order:
+            inst = s.get_instance(o)
+            if inst:
+                addrs.append(inst.private_ip_address)
+        output.append({
+            'service': s.service,
+            'region': s.region,
+            'order': order,
+            'addrs': addrs,
+            'settings': settings
+            })
+
+    if args.json:
+        print json.dumps(output, indent=4, separators=(',', ': '))
+    elif args.yaml:
+        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
+    else:
+        for o in output:
+            print str(o)
+
+    sys.exit(0)
+
+
 def billow_rotate_deregister():
     catch_sigint()
     parser = common_parser('billow rotate deregister')
@@ -597,8 +659,9 @@ def billow_rotate_terminate():
     )
     parser.add_argument(
         'instance',
+        nargs='+',
         type=str,
-        help='instance to terminate'
+        help='instances to terminate'
     )
     args = parser.parse_args()
     common_args(args)
@@ -614,7 +677,8 @@ def billow_rotate_terminate():
         sys.exit(errno.ENOENT)
     for s in services:
         r = billow.billowRotate(s)
-        r.terminate(args.instance, wait=wait, timeout=args.timeout)
+        for i in args.instance:
+            r.terminate(i, wait=wait, timeout=args.timeout)
 
     if args.json:
         print json.dumps(output, indent=4, separators=(',', ': '))
