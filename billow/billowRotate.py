@@ -706,16 +706,16 @@ class billowRotate(object):
                     (instance_id, raw))
         return retcode
 
-    def wait_notify(self, group, instance_id, sleep=5, timeout=None):
+    def status_check(self, group, instance_id, sleep=5, timeout=None):
         """
-        Wait for GET to 'urlstatus' to return "OK" or '{"status": "OK"}'
+        Check /status endpoint, return (True/False, code)
         """
         if 'urlstatus' not in group.settings:
-            return True
+            return (True, None)
         split = group.settings['urlstatus'].split(':')
         if len(split) != 2:
             self.log("instance %s status url invalid config")
-            return False
+            return (False, None)
         port = int(split[0])
         path = split[1]
 
@@ -725,64 +725,72 @@ class billowRotate(object):
 
         if port == 0 or path[0] != '/':
             self.log("instance %s status url invalid config")
-            return False
+            return (False, None)
 
         # Always require a timeout
         urltimeout = timeout
         if not timeout:
             urltimeout = self.urltimeout
 
+        instance = self.find_group_instance(group, instance_id)
+        if not instance:
+            self.log('no instance found, cannot status check instance %s ' \
+                    'url status' % instance_id)
+            return (False, None)
+
+        url = 'http://%s:%d%s' % (instance.private_ip_address, port, path)
+        data = None
+        header = {'Content-Type': 'application/json;charset=UTF-8'}
+        req = urllib2.Request(url, data, header)
+
+        healthy = True
+        status = ''
+        raw = ''
+        try:
+            with closing(urllib2.urlopen(req, timeout=urltimeout)) as f:
+                raw = f.read()
+        except urllib2.HTTPError, e:
+            # HTTP reply 3xx-5xx, not ready
+            self.log("instance %s status url failure (code %d)" % \
+                    (instance_id, e.code))
+            raw = e.read()
+            healthy = False
+        except urllib2.URLError, e:
+            # Connection error, must assume service is gone
+            self.log("instance %s status url gone, continuing (%s)" % \
+                    (instance_id, e.reason))
+            raw = str(e.reason)
+            # XXX wait on timed out?
+            if str(e.reason) == "timed out":
+                healthy = False
+
+        if raw and len(raw):
+            # Parse response, just raw response if not JSON
+            try:
+                status = json.loads(raw)
+            except:
+                # Invalid JSON
+                status = raw
+
+        if isinstance(status, dict) and 'status' in status:
+            if (len(status['status']) > 0 and \
+                    status['status'] != successcode):
+                healthy = False
+
+        return (healthy, status)
+
+    def wait_notify(self, group, instance_id, sleep=5, timeout=None):
+        """
+        Wait for GET to 'urlstatus' to return "OK" or '{"status": "OK"}'
+        """
         starttime = 0
         if timeout:
             starttime = time.time()
 
         healthy = False
         while not healthy:
-            instance = self.find_group_instance(group, instance_id)
-            if not instance:
-                self.log('no instance found, cannot wait for instance %s ' \
-                        'url status' % instance_id)
-                return False
-
-            url = 'http://%s:%d%s' % (instance.private_ip_address, port, path)
-            data = None
-            header = {'Content-Type': 'application/json;charset=UTF-8'}
-            req = urllib2.Request(url, data, header)
-
-            healthy = True
-            raw = ''
-            try:
-                with closing(urllib2.urlopen(req, timeout=urltimeout)) as f:
-                    raw = f.read()
-            except urllib2.HTTPError, e:
-                # HTTP reply 3xx-5xx, not ready
-                self.log("instance %s status url failure (code %d)" % \
-                        (instance_id, e.code))
-                raw = e.read()
-                healthy = False
-            except urllib2.URLError, e:
-                # Connection error, must assume service is gone
-                self.log("instance %s status url gone, continuing (%s)" % \
-                        (instance_id, e.reason))
-                healthy = True
-                # XXX wait on timed out?
-                if str(e.reason) == "timed out":
-                    healthy = False
-
-            # Parse response, just raw response if not JSON
-            try:
-                response = json.loads(raw)
-            except ValueError:
-                # Invalid JSON
-                response = dict()
-                if isinstance(raw, str):
-                    response['status'] = raw
-
-            # Compare against expected status value
-            if 'status' in response:
-                if (len(response['status']) > 0 and \
-                        response['status'] != successcode):
-                    healthy = False
+            (healthy, status) = self.status_check(group, instance_id, sleep,
+                    timeout)
 
             if not healthy and timeout and (time.time() - starttime) > timeout:
                 self.log('timed out waiting for instance %s status url' \
@@ -795,11 +803,10 @@ class billowRotate(object):
                     timeoutstr = ' timeout %ds' \
                             % int(timeout - (time.time() - starttime))
                 responsestr = ''
-                if response and 'status' in response:
-                    responsestr = ' response %s' % response['status']
-                self.log('sleeping %ds waiting for instance %s status url ' \
-                        '%s%s%s' % (sleep, instance_id, url, timeoutstr,
-                            responsestr))
+                if status and 'status' in status:
+                    responsestr = ' notify %s' % status['status']
+                self.log('sleeping %ds waiting for instance %s status' \
+                        '%s%s' % (sleep, instance_id, timeoutstr, responsestr))
                 time.sleep(sleep)
 
         return True

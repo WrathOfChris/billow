@@ -32,6 +32,7 @@ setup(
             "billow-rotate-deregister = billow.cli:billow_rotate_deregister",
             "billow-rotate-instance = billow.cli:billow_rotate_instance",
             "billow-rotate-register = billow.cli:billow_rotate_register",
+            "billow-rotate-status= billow.cli:billow_rotate_status",
             "billow-rotate-terminate = billow.cli:billow_rotate_terminate"
         ]
     }

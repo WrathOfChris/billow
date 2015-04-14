@@ -493,6 +493,65 @@ def billow_rotate_info():
     sys.exit(0)
 
 
+def billow_rotate_status():
+    catch_sigint()
+    parser = common_parser('billow rotate')
+    parsergroup = parser.add_mutually_exclusive_group()
+    parsergroup.add_argument(
+        '-j',
+        '--json',
+        help='json output',
+        action='store_true'
+    )
+    parsergroup.add_argument(
+        '-y',
+        '--yaml',
+        help='yaml output',
+        action='store_true'
+    )
+    parser.add_argument(
+        'service',
+        type=str,
+        help='service to rotate'
+    )
+    args = parser.parse_args()
+    common_args(args)
+
+    output = list()
+    bc = billow.billowCloud(regions=args.regions)
+    services = bc.get_service(args.service)
+    if not services:
+        sys.stderr.write('no service found\n')
+        sys.exit(errno.ENOENT)
+    for s in services:
+        r = billow.billowRotate(s)
+        settings = list()
+        for g in s.groups:
+            g.refresh()
+            if g.settings:
+                settings.append(g.settings)
+        order = r.order()
+        addrs = list()
+        for o in order:
+            group = r.find_group_by_instance(o)
+            (healthy, status) = r.status_check(group, o, sleep=0, timeout=0)
+            output.append({
+                'instance': o,
+                'healthy': healthy,
+                'status': status
+                })
+
+    if args.json:
+        print json.dumps(output, indent=4, separators=(',', ': '))
+    elif args.yaml:
+        print yaml.safe_dump(output, encoding='utf-8', allow_unicode=True)
+    else:
+        for o in output:
+            print str(o)
+
+    sys.exit(0)
+
+
 def billow_rotate_deregister():
     catch_sigint()
     parser = common_parser('billow rotate deregister')
