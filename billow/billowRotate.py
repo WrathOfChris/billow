@@ -64,8 +64,8 @@ class billowRotate(object):
 
             # 3. Check for (cur == max == 1)
             if g.cur_size == 1 and g.max_size == 1:
-                warnings.append("%s temporary outage, single instance in ' \
-                        'group" % g.group)
+                warnings.append('%s temporary outage, single instance in ' \
+                        'group' % g.group)
 
             # 4. Check CrossZoneLB disabled and empty AZ
             for b in self.service.balancers:
