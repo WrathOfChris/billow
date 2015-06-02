@@ -189,6 +189,8 @@ class billowGroup(object):
                 self.settings['urlstatus'] = settings['urlstatus']
             if 'urlsuccess' in settings:
                 self.settings['urlsuccess'] = settings['urlsuccess']
+            if 'urlservicestatus' in settings:
+                self.settings['urlservicestatus'] = settings['urlservicestatus']
 
     def __load_config(self):
         if not self.rawconfig:

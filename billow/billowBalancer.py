@@ -270,3 +270,8 @@ class billowBalancer(object):
         self.__load()
         self.__load_attrs()
         return self.rawattrs.connection_draining.timeout
+
+    @property
+    def dns_name(self):
+        self.__load()
+        return self.rawelb.dns_name
