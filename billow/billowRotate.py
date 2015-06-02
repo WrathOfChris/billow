@@ -714,7 +714,7 @@ class billowRotate(object):
             return (True, None)
         split = group.settings['urlstatus'].split(':')
         if len(split) != 2:
-            self.log("instance %s status url invalid config")
+            self.log("instance %s status url invalid config" % instance_id)
             return (False, None)
         port = int(split[0])
         path = split[1]
@@ -724,7 +724,7 @@ class billowRotate(object):
             successcode = group.settings['urlsuccess']
 
         if port == 0 or path[0] != '/':
-            self.log("instance %s status url invalid config")
+            self.log("instance %s status url invalid config" % instance_id)
             return (False, None)
 
         # Always require a timeout
@@ -779,6 +779,82 @@ class billowRotate(object):
 
         return (healthy, status)
 
+    def status_check_service(self, group, sleep=5, timeout=None):
+        """
+        Check service /status endpoint, return (True/False, code)
+        """
+        if 'urlservicestatus' not in group.settings:
+            return (True, None)
+        split = group.settings['urlservicestatus'].split(':')
+        if len(split) != 2:
+            self.log("service status url invalid config")
+            return (False, None)
+        port = int(split[0])
+        path = split[1]
+
+        successcode = 'OK'
+        if 'urlsuccess' in group.settings:
+            successcode = group.settings['urlsuccess']
+
+        if port == 0 or path[0] != '/':
+            self.log("service status url invalid config")
+            return (False, None)
+
+        # Always require a timeout
+        urltimeout = timeout
+        if not timeout:
+            urltimeout = self.urltimeout
+
+        # Find ELB, or exit
+        if len(group.load_balancers) < 1:
+            return (True, None)
+        balancer = self.find_balancer(group.load_balancers[0])
+        if not balancer:
+            self.log('no balancer found, cannot wait for service status from '
+                    'balancer %s' % group.load_balancers[0])
+            return (False, None)
+
+        url = 'http://%s:%d%s' % (balancer.dns_name, port, path)
+        data = None
+        header = {'Content-Type': 'application/json;charset=UTF-8'}
+        req = urllib2.Request(url, data, header)
+
+        healthy = True
+        status = ''
+        raw = ''
+        try:
+            with closing(urllib2.urlopen(req, timeout=urltimeout)) as f:
+                raw = f.read()
+        except urllib2.HTTPError, e:
+            # HTTP reply 3xx-5xx, not ready
+            self.log("balancer %s status url failure (code %d)" % \
+                    (balancer.name, e.code))
+            raw = e.read()
+            healthy = False
+        except urllib2.URLError, e:
+            # Connection error, must assume service is gone
+            self.log("balancer %s status url gone, continuing (%s)" % \
+                    (balancer.name, e.reason))
+            raw = str(e.reason)
+            # XXX wait on timed out?
+            if str(e.reason) == "timed out":
+                healthy = False
+
+        if raw and len(raw):
+            # Parse response, just raw response if not JSON
+            try:
+                status = json.loads(raw)
+            except:
+                # Invalid JSON
+                status = raw
+
+        if isinstance(status, dict) and 'status' in status:
+            if (len(status['status']) > 0 and \
+                    status['status'] != successcode):
+                healthy = False
+
+        return (healthy, status)
+
     def wait_notify(self, group, instance_id, sleep=5, timeout=None):
         """
         Wait for GET to 'urlstatus' to return "OK" or '{"status": "OK"}'
@@ -807,6 +883,38 @@ class billowRotate(object):
                     responsestr = ' notify %s' % status['status']
                 self.log('sleeping %ds waiting for instance %s status' \
                         '%s%s' % (sleep, instance_id, timeoutstr, responsestr))
+                time.sleep(sleep)
+
+        return True
+
+    def wait_service(self, group, sleep=5, timeout=None):
+        """
+        Wait for GET to balancer 'urlservicestatus' to return "OK" or
+        '{"status": "OK"}'
+        """
+        starttime = 0
+        if timeout:
+            starttime = time.time()
+
+        healthy = False
+        while not healthy:
+            (healthy, status) = self.status_check_service(group, sleep,
+                    timeout)
+
+            if not healthy and timeout and (time.time() - starttime) > timeout:
+                self.log('timed out waiting for service status url')
+                return False
+
+            if not healthy:
+                timeoutstr = ''
+                if timeout:
+                    timeoutstr = ' timeout %ds' \
+                            % int(timeout - (time.time() - starttime))
+                responsestr = ''
+                if status and 'status' in status:
+                    responsestr = ' notify %s' % status['status']
+                self.log('sleeping %ds waiting for service status' \
+                        '%s%s' % (sleep, timeoutstr, responsestr))
                 time.sleep(sleep)
 
         return True
@@ -906,6 +1014,10 @@ class billowRotate(object):
             waittime = self.wait_timeout(timeout, starttime)
         ret = self.wait_launch(group, instlist, timeout=waittime)
         if ret == False:
+            return False
+
+        # Wait for service /status
+        if not self.wait_service(group, timeout=timeout):
             return False
 
         if terminate_after:
