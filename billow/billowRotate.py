@@ -1079,7 +1079,7 @@ class billowRotate(object):
         addrlist = list()
         for n in instance.interfaces:
             # ElasticIPs are owned by account number, standard by 'amazon'
-            if 'owner' in n and n['owner'] != 'amazon':
+            if 'owner' in n and n['owner'] != 'amazon' and n['owner'] != 'system.zim.mapped':
                 addrlist.append(n['public_ip_address'])
 
         if not addrlist:
